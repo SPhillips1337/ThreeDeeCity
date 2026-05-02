@@ -1,4 +1,4 @@
-# FreeCity
+# ThreeDeeCity
 
 A high-performance, 3D city-building simulation built for the web. Experience the thrill of urban planning with real-time simulation, dynamic zoning, and complex infrastructure management.
 

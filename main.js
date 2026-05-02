@@ -6,23 +6,23 @@ class Game {
   constructor() {
     this.city = new City(32, 32);
     this.sceneManager = new SceneManager(this.city);
-    
+
     this.activeToolId = 'tool-select';
     this.lastTickTime = 0;
     this.tickInterval = 1000;
     this.isPaused = false;
     this.timeScale = 1;
-    
+
     this.dragStart = null;
     this.isDragging = false;
-    
+
     this.init();
   }
 
   init() {
     // Start rendering
     this.animate();
-    
+
     // Setup window resize
     window.addEventListener('resize', () => {
       this.sceneManager.onResize();
@@ -91,13 +91,13 @@ class Game {
 
     // Initial stats update
     this.updateUI();
-    
-    console.log('FreeCity Initialized');
+
+    console.log('ThreeDeeCity Initialized');
   }
 
   animate(time) {
     requestAnimationFrame((t) => this.animate(t));
-    
+
     // Update simulation
     const effectiveInterval = this.tickInterval / this.timeScale;
     if (!this.isPaused && (time - this.lastTickTime > effectiveInterval)) {
@@ -105,7 +105,7 @@ class Game {
       this.lastTickTime = time;
       this.updateUI();
     }
-    
+
     // Render scene
     this.sceneManager.update(this.city);
   }
@@ -157,7 +157,7 @@ class Game {
       // SimCity style: draw along the primary axis of drag
       const dx = Math.abs(end.x - start.x);
       const dy = Math.abs(end.y - start.y);
-      
+
       if (dx > dy) {
         for (let x = minX; x <= maxX; x++) this.applyTool(x, start.y);
       } else {
