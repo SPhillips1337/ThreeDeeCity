@@ -92,7 +92,7 @@ class Game {
     // Initial stats update
     this.updateUI();
     
-    console.log('Antigravity SimCity Initialized');
+    console.log('FreeCity Initialized');
   }
 
   animate(time) {

@@ -1,77 +1,77 @@
-# Antigravity Agents Prompt Protocol
+# FreeCity
 
-A high-velocity development framework for autonomous AI agents within the Google Antigravity IDE.
+A high-performance, 3D city-building simulation built for the web. Experience the thrill of urban planning with real-time simulation, dynamic zoning, and complex infrastructure management.
 
-## 🚀 Overview
+## 🏗 Features
 
-The Anti-Gravity project defines a robust set of instructions and architectural patterns designed to minimize "Drag" (ambiguity, technical debt, manual verification) and maximize development momentum. It enables AI agents to operate with surgical precision, leveraging long-term memory and autonomous verification.
+- **3D City Rendering:** Built with **Three.js** for a smooth, immersive 3D experience directly in your browser.
+- **Dynamic Zoning (RCI):** 
+  - **Residential:** Houses and apartments for your citizens.
+  - **Commercial:** Shops and services to drive the economy.
+  - **Industrial:** Factories and production centers.
+- **Infrastructure:** Lay down complex road networks to connect your city.
+- **Real-time Simulation:** Advanced simulation engine tracking population growth, economic health, and time progression.
+- **Interactive Tools:**
+  - **Zone Tool:** Easily zoning areas for development.
+  - **Road Tool:** Intelligent pathfinding and road placement.
+  - **Bulldoze:** Clear space for new developments.
+- **Time Controls:** Play, Pause, and Fast-Forward to manage your city's growth.
 
-## 🧠 Core Identity: The Anti-Gravity Engineer
+## 🛠 Tech Stack
 
-Agents operating under this protocol act as **autonomous Staff Software Engineers**. The primary directive is to deliver robust solutions with zero friction.
+- **Frontend:** Vanilla JavaScript, HTML5, CSS3
+- **Graphics:** [Three.js](https://threejs.org/) (WebGL)
+- **Build Tool:** [Vite](https://vitejs.dev/)
+- **Simulation:** Custom modular simulation engine with road-access requirements.
 
-## 🛠 Trinity Orchestration (Self-Evolution)
+## 🚀 Getting Started
 
-The system utilizes three specialized analytical lenses to optimize project velocity:
+### Prerequisites
 
-- **[Echo] Structural Memory:** Detects patterns and extracts lessons to `.antigravity/memories/patterns_and_lessons.md`.
-- **[Ripple] Relational Patterns:** Analyzes the "blast radius" of changes across dependencies (DB -> API -> Frontend).
-- **[Pulse] Velocity Monitor:** Halts failing paths, resets state, and pivots to lower-gravity approaches if momentum stalls.
+- [Node.js](https://nodejs.org/) (Latest LTS recommended)
+- npm or yarn
 
-## 📂 Project Structure
+### Installation
 
-- `AGENTS.md`: The core development protocol and agent rules.
-- `BOOTSTRAP.md`: Instructions for initializing the Long-Term Memory (LTM) system.
-- `system-prompt.md`: The unified master prompt for agent configuration.
-- `.antigravity/memories/`: Persistent storage for codebase insights, architectural decisions, and lessons learned.
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/SPhillips1337/simcity.git
+   cd simcity
+   ```
 
-## 📝 Long-Term Memory (LTM)
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
 
-Inspired by Langchain Deep Agents, our memory is split between ephemeral context and persistent knowledge:
-- **`codebase_insights/`**: High-level summaries of complex modules.
-- **`architectural_decisions/`**: Logs of major design choices and tradeoffs.
-- **`patterns_and_lessons.md`**: Success logs and post-mortems.
+3. Start the development server:
+   ```bash
+   npm run dev
+   ```
 
-## 🚦 Usage
+4. Open your browser to `http://localhost:5173`.
 
-1. **Initialize:** Use the content from `system-prompt.md` in your agent's system instructions.
-2. **Bootstrap:** Run the `BOOTSTRAP.md` workflow to populate the initial `.antigravity/memories/` directory from project history.
-3. **Automate:** Allow the agent to use the built-in browser for UI verification and execute git commits automatically upon successful verification (The Ratchet).
+## 🎮 Controls
 
-## 🌐 Global Registration & Findings
+- **Mouse Wheel:** Zoom in/out
+- **Right Click + Drag:** Rotate Camera
+- **Left Click:** Use Active Tool
+- **Left Click + Drag:** Area Zoning / Road Placement
+- **Keyboard Shortcuts:**
+  - `S`: Select Tool
+  - `R`: Residential Zone
+  - `C`: Commercial Zone
+  - `I`: Industrial Zone
+  - `W`: Road Tool
+  - `B`: Bulldozer
 
-To apply the Anti‑Gravity protocol globally:
+## 🧪 Development Protocol
 
-1. **Copy** `system-prompt.md` (or your custom prompt) into `~/.deepagents/agent/agent.md`.
-2. **Append** the content to the end of the file – this merges the protocol with the core agent instructions.
-3. **Restart** the Antigravity IDE or reload the agent to pick up the changes.
+This project is developed using the **Antigravity Development Protocol**, an autonomous agent-based workflow designed for high-velocity engineering. See [AGENTS.md](AGENTS.md) for more details.
 
-### What We Verified
+## 📜 License
 
-- **The Ratchet** – after a successful test run, the agent automatically performed `git add` and `git commit` without prompting.
-- **Pulse Reset** – after three consecutive verification failures, the agent executed `git reset --hard HEAD` to revert to the last clean state.
-- Both behaviors were demonstrated in the `tests/protocol_verification/` stress‑test suite.
-
-Now every new Antigravity session will enforce these autonomous Git actions, ensuring momentum is never lost.
-
-## 🌟 Credits & Prior Art
-
-The Anti-Gravity Protocol is built upon the collective intelligence of the AI engineering community. We owe our high-velocity patterns to the following pioneers:
-
-- **[IJFW (It Just F*cking Works)](https://github.com/TheRealSeanDonahoe/ijfw)**: Created by [Sean Donahoe](https://github.com/TheRealSeanDonahoe). We integrated the **Donahoe Loop** (Quick/Deep workflows), **Output Discipline**, and the **Trident Audit** architecture to reduce token burn and eliminate conversational friction.
-- **[OctaMem](https://octamem.com)**: For the persistent intelligence model that powers our Semantic, Episodic, and Procedural memory architecture.
-- **[uSwarm](https://github.com/SPhillips1337/uSwarm)**: For the **Architect/Manager/Worker/Owner** assembly line orchestration model and Identity Lock mechanisms.
-- **[LLM-Codex-Reference-Vault](https://github.com/SPhillips1337/LLM-Codex-Reference-Vault)**: For the Neo4j-backed semantic context layer that provides ground-truth patterns for cross-language development.
-- **[Langchain Deep Agents](https://github.com/langchain-ai/langchain)**: For foundational concepts in context-enrichment and autonomous planning.
-- **[40MCP](https://github.com/SPhillips1337/40mcp)**: For proxy-based tool discovery and dynamic MCP server orchestration.
-- **[Claude Code](https://github.com/anthropics/claude-code)**: For inspiring high-velocity interaction patterns and the "Ratchet" momentum system.
-
-## 🛠 Modern Standards & Planning
-
-Anti-Gravity enforces a "Think Before You Act" philosophy:
-- **Comprehensive Planning:** Every task begins with a checklist covering technical, architectural, and dependency implications.
-- **Up-to-Date Baseline:** Solutions are implemented using industry best practices current as of the session date.
-- **Zero-Stale Patterns:** Agents are prohibited from using deprecated libraries or outdated implementation patterns.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 
