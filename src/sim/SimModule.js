@@ -28,16 +28,28 @@ export class RoadAccessModule extends SimModule {
       { x: tile.x, y: tile.y + 1 },
       { x: tile.x, y: tile.y - 1 }
     ];
-
+ 
     for (const pos of neighbors) {
       if (pos.x >= 0 && pos.x < city.size.width && pos.y >= 0 && pos.y < city.size.height) {
-        if (city.grid[pos.x][pos.y].type === 'road') {
+        const neighbor = city.grid[pos.x][pos.y];
+        if (neighbor.type === 'road' || neighbor.type === 'highway') {
           this.hasAccess = true;
-          // console.log(`Tile at ${tile.x},${tile.y} has road access`);
           break;
         }
       }
     }
+  }
+}
+
+export class TrafficModule extends SimModule {
+  constructor() {
+    super();
+    this.name = 'Traffic';
+    this.congestion = 0;
+  }
+
+  simulate(tile, city) {
+    this.congestion = city.trafficGrid[tile.x][tile.y] || 0;
   }
 }
 

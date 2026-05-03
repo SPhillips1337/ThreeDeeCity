@@ -224,11 +224,15 @@ class Game {
     if (toolId.startsWith('tool-commercial')) return GameConfig.costs.commercial[toolId.split('-')[2]];
     if (toolId.startsWith('tool-industrial')) return GameConfig.costs.industrial[toolId.split('-')[2]];
     if (toolId === 'tool-road') return GameConfig.costs.road;
+    if (toolId === 'tool-highway') return GameConfig.costs.highway;
     if (toolId === 'tool-power-line') return GameConfig.costs.powerLine;
     if (toolId === 'tool-bulldoze') return GameConfig.costs.bulldoze;
     if (toolId === 'tool-power-coal') return GameConfig.costs.power.coal;
     if (toolId === 'tool-power-wind') return GameConfig.costs.power.wind;
     if (toolId === 'tool-water-pump') return GameConfig.costs.water.pump;
+    if (toolId === 'tool-bus-stop') return GameConfig.costs.transit.busStop;
+    if (toolId === 'tool-rail-line') return GameConfig.costs.transit.railLine;
+    if (toolId === 'tool-rail-station') return GameConfig.costs.transit.railStation;
     return 0;
   }
 
@@ -254,9 +258,12 @@ class Game {
     } else if (this.activeToolId === 'tool-road') {
       tile.type = 'road';
       changed = true;
+    } else if (this.activeToolId === 'tool-highway') {
+      tile.type = 'highway';
+      changed = true;
     } else if (this.activeToolId === 'tool-power-line') {
-      // Allow placing power lines over roads
-      if (tile.type === 'road') {
+      // Allow placing power lines over roads or highways
+      if (tile.type === 'road' || tile.type === 'highway') {
         tile.overlay = 'power-line';
       } else {
         tile.type = 'power-line';
@@ -283,6 +290,15 @@ class Game {
       changed = true;
     } else if (this.activeToolId === 'tool-water-pump') {
       tile.type = 'water-pump';
+      changed = true;
+    } else if (this.activeToolId === 'tool-bus-stop') {
+      tile.type = 'bus-stop';
+      changed = true;
+    } else if (this.activeToolId === 'tool-rail-line') {
+      tile.type = 'rail-line';
+      changed = true;
+    } else if (this.activeToolId === 'tool-rail-station') {
+      tile.type = 'rail-station';
       changed = true;
     }
 

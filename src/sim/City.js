@@ -1,5 +1,5 @@
 import { Tile } from './Tile.js';
-import { RoadAccessModule, PowerModule, WaterModule } from './SimModule.js';
+import { RoadAccessModule, PowerModule, WaterModule, TrafficModule } from './SimModule.js';
 import { GameConfig } from '../GameConfig.js';
 
 export class City {
@@ -10,6 +10,7 @@ export class City {
     
     this.powerGrid = [];
     this.waterGrid = [];
+    this.trafficGrid = [];
     
     this.stats = {
       population: 0,
@@ -35,14 +36,17 @@ export class City {
       this.grid[x] = [];
       this.powerGrid[x] = [];
       this.waterGrid[x] = [];
+      this.trafficGrid[x] = [];
       for (let y = 0; y < this.size.height; y++) {
         const tile = new Tile(x, y);
         tile.addModule(new RoadAccessModule());
         tile.addModule(new PowerModule());
         tile.addModule(new WaterModule());
+        tile.addModule(new TrafficModule());
         this.grid[x][y] = tile;
         this.powerGrid[x][y] = false;
         this.waterGrid[x][y] = false;
+        this.trafficGrid[x][y] = 0;
       }
     }
   }
@@ -50,8 +54,9 @@ export class City {
   simulate() {
     this.stats.date.setDate(this.stats.date.getDate() + 1);
     
-    // Update infrastructure before tile simulation
+    // Update infrastructure and traffic before tile simulation
     this.updateInfrastructureGrids();
+    this.updateTraffic();
 
     // Monthly budget processing
     if (this.stats.date.getDate() === 1) {
@@ -212,8 +217,102 @@ export class City {
     }
     this.stats.population = Math.floor(totalPop);
     this.stats.jobs = Math.floor(totalJobs);
-    if (this.stats.population > 0 && Math.random() > 0.9) {
-      console.log(`City Population: ${this.stats.population}`);
+  }
+
+  updateTraffic() {
+    // 1. Decay traffic
+    for (let x = 0; x < this.size.width; x++) {
+      for (let y = 0; y < this.size.height; y++) {
+        this.trafficGrid[x][y] *= 0.5;
+      }
     }
+
+    // 2. Sample random commuters
+    const residentialTiles = [];
+    const jobTiles = [];
+    for (let x = 0; x < this.size.width; x++) {
+      for (let y = 0; y < this.size.height; y++) {
+        const tile = this.grid[x][y];
+        if (tile.type === 'residential' && tile.residents > 0) residentialTiles.push(tile);
+        if ((tile.type === 'commercial' || tile.type === 'industrial') && tile.jobs > 0) jobTiles.push(tile);
+      }
+    }
+
+    // Limit number of pathfinding calls per tick for performance
+    const samples = Math.min(residentialTiles.length, 10);
+    for (let i = 0; i < samples; i++) {
+      const start = residentialTiles[Math.floor(Math.random() * residentialTiles.length)];
+      const end = jobTiles[Math.floor(Math.random() * jobTiles.length)];
+      if (start && end) {
+        const path = this.findPath(start, end);
+        if (path) {
+          path.forEach(p => {
+            this.trafficGrid[p.x][p.y] += 5; // Add traffic weight
+          });
+        }
+      }
+    }
+  }
+
+  /**
+   * Simple A* Pathfinding for commuters
+   */
+  findPath(start, end) {
+    const openSet = [{ x: start.x, y: start.y, g: 0, f: 0, parent: null }];
+    const closedSet = new Set();
+    const target = { x: end.x, y: end.y };
+
+    while (openSet.length > 0) {
+      openSet.sort((a, b) => a.f - b.f);
+      const current = openSet.shift();
+      const key = `${current.x},${current.y}`;
+
+      if (current.x === target.x && current.y === target.y) {
+        const path = [];
+        let temp = current;
+        while (temp) {
+          path.push({ x: temp.x, y: temp.y });
+          temp = temp.parent;
+        }
+        return path;
+      }
+
+      closedSet.add(key);
+
+      const neighbors = [
+        { x: current.x + 1, y: current.y },
+        { x: current.x - 1, y: current.y },
+        { x: current.x, y: current.y + 1 },
+        { x: current.x, y: current.y - 1 }
+      ];
+
+      for (const n of neighbors) {
+        if (n.x < 0 || n.x >= this.size.width || n.y < 0 || n.y >= this.size.height) continue;
+        if (closedSet.has(`${n.x},${n.y}`)) continue;
+
+        const tile = this.grid[n.x][n.y];
+        // Commuters only travel on roads, highways, or rail (simplified for now)
+        const isTransit = tile.type === 'road' || tile.type === 'highway' || tile.type === 'rail-line' || 
+                          tile.type === 'residential' || tile.type === 'commercial' || tile.type === 'industrial';
+        
+        if (!isTransit) continue;
+
+        const g = current.g + 1;
+        const h = Math.abs(n.x - target.x) + Math.abs(n.y - target.y);
+        const f = g + h;
+
+        const existing = openSet.find(o => o.x === n.x && o.y === n.y);
+        if (existing) {
+          if (g < existing.g) {
+            existing.g = g;
+            existing.f = f;
+            existing.parent = current;
+          }
+        } else {
+          openSet.push({ ...n, g, f, parent: current });
+        }
+      }
+    }
+    return null;
   }
 }

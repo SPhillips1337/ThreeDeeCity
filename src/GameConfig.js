@@ -17,6 +17,7 @@ export const GameConfig = {
       heavy: 400
     },
     road: 10,
+    highway: 50,
     powerLine: 5,
     bulldoze: 5,
     power: {
@@ -25,6 +26,11 @@ export const GameConfig = {
     },
     water: {
       pump: 2500
+    },
+    transit: {
+      busStop: 500,
+      railLine: 100,
+      railStation: 3000
     }
   },
   

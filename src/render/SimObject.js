@@ -51,7 +51,15 @@ export class SimObject extends THREE.Group {
     const level = this.tile.developmentLevel || 0;
     switch (type) {
       case 'road':
+        return new THREE.BoxGeometry(1, 0.05, 1);
+      case 'highway':
         return new THREE.BoxGeometry(1, 0.1, 1);
+      case 'bus-stop':
+        return new THREE.BoxGeometry(0.4, 0.3, 0.2);
+      case 'rail-line':
+        return new THREE.BoxGeometry(1, 0.1, 0.4);
+      case 'rail-station':
+        return new THREE.BoxGeometry(1.5, 1, 1.5);
       case 'power-line':
         return new THREE.BoxGeometry(0.1, 1.2, 0.1);
       case 'power-coal':
@@ -88,7 +96,20 @@ export class SimObject extends THREE.Group {
 
     switch (type) {
       case 'road':
-        return new THREE.MeshPhongMaterial({ color: 0x333333 });
+      case 'highway':
+        const baseColor = type === 'road' ? new THREE.Color(0x333333) : new THREE.Color(0x111111);
+        const traffic = this.tile.modules.find(m => m.name === 'Traffic');
+        if (traffic && traffic.congestion > 0) {
+          const congestionFactor = Math.min(1, traffic.congestion / 100);
+          baseColor.lerp(new THREE.Color(0xef4444), congestionFactor); // Fade to red
+        }
+        return new THREE.MeshPhongMaterial({ color: baseColor });
+      case 'bus-stop':
+        return new THREE.MeshPhongMaterial({ color: 0x3b82f6 });
+      case 'rail-line':
+        return new THREE.MeshPhongMaterial({ color: 0x94a3b8 });
+      case 'rail-station':
+        return new THREE.MeshPhongMaterial({ color: 0x475569 });
       case 'power-line':
         return new THREE.MeshPhongMaterial({ color: 0x8b4513 });
       case 'power-coal':

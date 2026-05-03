@@ -36,14 +36,20 @@ export class Tile {
     const roadAccess = this.modules.find(m => m.name === 'RoadAccess');
     const power = this.modules.find(m => m.name === 'Power');
     const water = this.modules.find(m => m.name === 'Water');
+    const traffic = this.modules.find(m => m.name === 'Traffic');
 
     if (!roadAccess || !roadAccess.hasAccess) {
-      if (this.residents > 0) {
-        console.log(`Tile at ${this.x},${this.y} lost road access!`);
-      }
       this.abandoned = true;
       this.residents = 0;
       this.developmentLevel = 0;
+      return;
+    }
+
+    // High congestion leads to abandonment
+    if (traffic && traffic.congestion > 80) {
+      this.abandoned = true;
+      this.residents *= 0.95;
+      if (this.residents < 1) this.developmentLevel = 0;
       return;
     }
 
@@ -61,10 +67,10 @@ export class Tile {
     const capacity = Math.pow(this.density, 2) * 50;
     
     if (this.residents < capacity && hasInfrastructure) {
-      // Aggressive growth for testing
-      const growth = 5 + Math.random() * 5; 
-      this.residents += growth;
-      console.log(`Tile at ${this.x},${this.y} growing: ${this.residents.toFixed(1)}`);
+      // Growth slowed by traffic
+      const trafficPenalty = traffic ? Math.max(0, (traffic.congestion / 100)) : 0;
+      const growth = (5 + Math.random() * 5) * (1 - trafficPenalty); 
+      this.residents += Math.max(0, growth);
     }
 
     // Level up based on population
@@ -77,6 +83,7 @@ export class Tile {
     const roadAccess = this.modules.find(m => m.name === 'RoadAccess');
     const power = this.modules.find(m => m.name === 'Power');
     const water = this.modules.find(m => m.name === 'Water');
+    const traffic = this.modules.find(m => m.name === 'Traffic');
 
     if (!roadAccess || !roadAccess.hasAccess || !power.hasPower || !water.hasWater) {
       this.abandoned = true;
@@ -85,10 +92,19 @@ export class Tile {
       return;
     }
 
+    // Commercial is VERY sensitive to traffic
+    if (traffic && traffic.congestion > 70) {
+      this.abandoned = true;
+      this.jobs *= 0.9;
+      if (this.jobs < 1) this.developmentLevel = 0;
+      return;
+    }
+
     this.abandoned = false;
     const capacity = Math.pow(this.density, 2) * 30;
     if (this.jobs < capacity) {
-      this.jobs += Math.random() * 3;
+      const trafficPenalty = traffic ? Math.max(0, (traffic.congestion / 80)) : 0;
+      this.jobs += Math.random() * 3 * (1 - trafficPenalty);
     }
 
     if (this.jobs > capacity * 0.8 && this.developmentLevel < 3) {
@@ -100,6 +116,7 @@ export class Tile {
     const roadAccess = this.modules.find(m => m.name === 'RoadAccess');
     const power = this.modules.find(m => m.name === 'Power');
     const water = this.modules.find(m => m.name === 'Water');
+    const traffic = this.modules.find(m => m.name === 'Traffic');
 
     if (!roadAccess || !roadAccess.hasAccess || !power.hasPower) {
       this.abandoned = true;
@@ -108,10 +125,19 @@ export class Tile {
       return;
     }
 
+    // Industrial is moderately sensitive to traffic
+    if (traffic && traffic.congestion > 90) {
+      this.abandoned = true;
+      this.jobs *= 0.95;
+      if (this.jobs < 1) this.developmentLevel = 0;
+      return;
+    }
+
     this.abandoned = false;
     const capacity = Math.pow(this.density, 2) * 40;
     if (this.jobs < capacity) {
-      this.jobs += Math.random() * 4;
+      const trafficPenalty = traffic ? Math.max(0, (traffic.congestion / 120)) : 0;
+      this.jobs += Math.random() * 4 * (1 - trafficPenalty);
     }
 
     if (this.jobs > capacity * 0.8 && this.developmentLevel < 3) {
