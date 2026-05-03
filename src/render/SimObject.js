@@ -49,6 +49,7 @@ export class SimObject extends THREE.Group {
 
   getGeometry(type = this.tile.type) {
     const level = this.tile.developmentLevel || 0;
+    const density = this.tile.density || 1; // 1:light, 2:medium, 3:heavy
     switch (type) {
       case 'road':
         return new THREE.BoxGeometry(1, 0.05, 1);
@@ -69,17 +70,48 @@ export class SimObject extends THREE.Group {
       case 'water-pump':
         return new THREE.BoxGeometry(1, 0.8, 1);
       case 'residential':
-        if (level === 0) return new THREE.BoxGeometry(0.9, 0.05, 0.9); // Zoned but empty
-        return new THREE.BoxGeometry(0.8, 0.5 + level * 0.5, 0.8);
       case 'commercial':
-        if (level === 0) return new THREE.BoxGeometry(0.9, 0.05, 0.9);
-        return new THREE.BoxGeometry(0.8, 0.8 + level * 0.8, 0.8);
       case 'industrial':
-        if (level === 0) return new THREE.BoxGeometry(0.9, 0.05, 0.9);
-        return new THREE.BoxGeometry(0.9, 0.4 + level * 0.4, 0.9);
+        if (level === 0) return new THREE.BoxGeometry(0.9, 0.05, 0.9); // Zoned, empty lot
+        return this._getBuildingGeometry(type, level, density);
       default:
-        return new THREE.BoxGeometry(0.1, 0.1, 0.1); // Hidden for grass
+        return new THREE.BoxGeometry(0.1, 0.1, 0.1);
     }
+  }
+
+  /**
+   * Returns a BoxGeometry sized by zone type, development level, and density.
+   * Level 1 = small/new. Level 3 = fully developed.
+   * Density 1=light, 2=medium, 3=heavy.
+   */
+  _getBuildingGeometry(type, level, density) {
+    // Footprint: heavier density = wider building within the tile
+    const footprintByDensity = [0, 0.45, 0.65, 0.85]; // index 0 unused
+    const footprint = footprintByDensity[density];
+
+    let height;
+    if (type === 'residential') {
+      // Light: cottages/townhouses (max ~2 storeys)
+      // Medium: apartment blocks (max ~5 storeys)
+      // Heavy: skyscrapers (max ~12 storeys)
+      const maxHeight = [0, 1.0, 3.0, 8.0][density];
+      height = (maxHeight / 3) * level;
+    } else if (type === 'commercial') {
+      // Light: small shops/strip malls
+      // Medium: mid-rise offices
+      // Heavy: glass towers
+      const maxHeight = [0, 1.2, 4.0, 10.0][density];
+      height = (maxHeight / 3) * level;
+    } else { // industrial
+      // Industry doesn't go tall — it goes wide. Heights stay modest.
+      const maxHeight = [0, 0.6, 1.0, 1.4][density];
+      // Footprint is bigger for heavy industry (sprawling factories)
+      const indFootprint = footprintByDensity[density] + (density === 3 ? 0.1 : 0);
+      return new THREE.BoxGeometry(indFootprint, maxHeight, indFootprint);
+    }
+
+    height = Math.max(0.2, height); // minimum visible height
+    return new THREE.BoxGeometry(footprint, height, footprint);
   }
 
   getMaterial(type = this.tile.type) {
