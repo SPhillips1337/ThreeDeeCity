@@ -49,16 +49,24 @@
       </div>
       <div class="separator vertical"></div>
       
-      <!-- RCI Indicator -->
-      <div id="rci-indicator">
-        <div class="rci-bar residential" title="Residential Demand">
-          <div id="demand-r" class="bar-fill"></div>
+      <!-- HUD Indicators -->
+      <div id="hud-indicators">
+        <div id="rci-indicator">
+          <div class="rci-bar residential" title="Residential Demand">
+            <div id="demand-r" class="bar-fill"></div>
+          </div>
+          <div class="rci-bar commercial" title="Commercial Demand">
+            <div id="demand-c" class="bar-fill"></div>
+          </div>
+          <div class="rci-bar industrial" title="Industrial Demand">
+            <div id="demand-i" class="bar-fill"></div>
+          </div>
         </div>
-        <div class="rci-bar commercial" title="Commercial Demand">
-          <div id="demand-c" class="bar-fill"></div>
-        </div>
-        <div class="rci-bar industrial" title="Industrial Demand">
-          <div id="demand-i" class="bar-fill"></div>
+        <div id="power-indicator" class="indicator-group">
+          <span class="label">Power</span>
+          <div class="meter-bg">
+            <div id="power-meter-fill" class="meter-fill"></div>
+          </div>
         </div>
       </div>
 
@@ -82,32 +90,53 @@
       </button>
       <div class="separator"></div>
       
-      <!-- Residential -->
-      <div class="tool-group">
-        <button class="tool-btn" id="tool-residential-light" title="Light Residential">R1</button>
-        <button class="tool-btn" id="tool-residential-medium" title="Medium Residential">R2</button>
-        <button class="tool-btn" id="tool-residential-heavy" title="Heavy Residential">R3</button>
+      <!-- Residential Category -->
+      <div class="tool-category" id="cat-residential">
+        <button class="tool-btn category-btn" title="Residential Zones">R</button>
+        <div class="drawer">
+          <button class="tool-btn" id="tool-residential-light" title="Light Residential">R1</button>
+          <button class="tool-btn" id="tool-residential-medium" title="Medium Residential">R2</button>
+          <button class="tool-btn" id="tool-residential-heavy" title="Heavy Residential">R3</button>
+        </div>
       </div>
       
-      <!-- Commercial -->
-      <div class="tool-group">
-        <button class="tool-btn" id="tool-commercial-light" title="Light Commercial">C1</button>
-        <button class="tool-btn" id="tool-commercial-medium" title="Medium Commercial">C2</button>
-        <button class="tool-btn" id="tool-commercial-heavy" title="Heavy Commercial">C3</button>
+      <!-- Commercial Category -->
+      <div class="tool-category" id="cat-commercial">
+        <button class="tool-btn category-btn" title="Commercial Zones">C</button>
+        <div class="drawer">
+          <button class="tool-btn" id="tool-commercial-light" title="Light Commercial">C1</button>
+          <button class="tool-btn" id="tool-commercial-medium" title="Medium Commercial">C2</button>
+          <button class="tool-btn" id="tool-commercial-heavy" title="Heavy Commercial">C3</button>
+        </div>
       </div>
       
-      <!-- Industrial -->
-      <div class="tool-group">
-        <button class="tool-btn" id="tool-industrial-light" title="Light Industrial">I1</button>
-        <button class="tool-btn" id="tool-industrial-medium" title="Medium Industrial">I2</button>
-        <button class="tool-btn" id="tool-industrial-heavy" title="Heavy Industrial">I3</button>
+      <!-- Industrial Category -->
+      <div class="tool-category" id="cat-industrial">
+        <button class="tool-btn category-btn" title="Industrial Zones">I</button>
+        <div class="drawer">
+          <button class="tool-btn" id="tool-industrial-light" title="Light Industrial">I1</button>
+          <button class="tool-btn" id="tool-industrial-medium" title="Medium Industrial">I2</button>
+          <button class="tool-btn" id="tool-industrial-heavy" title="Heavy Industrial">I3</button>
+        </div>
+      </div>
+
+      <div class="separator"></div>
+
+      <!-- Infrastructure Category -->
+      <div class="tool-category" id="cat-infrastructure">
+        <button class="tool-btn category-btn" title="Utilities">⚡</button>
+        <div class="drawer">
+          <button class="tool-btn" id="tool-power-coal" title="Coal Power Plant ($5,000)">🏭</button>
+          <button class="tool-btn" id="tool-power-wind" title="Wind Turbine ($1,000)">🍃</button>
+          <button class="tool-btn" id="tool-water-pump" title="Water Pump ($2,500)">💧</button>
+        </div>
       </div>
 
       <div class="separator"></div>
       <button class="tool-btn" id="tool-road" title="Build Road (W)">
         <svg viewBox="0 0 24 24"><path d="M11 16v-2h2v2h-2zm1-13C6.48 3 2 7.48 2 13s4.48 10 10 10 10-4.48 10-10S17.52 3 12 3zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13h-1v3h1V8zm0 4h-1v3h1v-3z" /></svg>
       </button>
-      <button class="tool-btn" id="tool-power" title="Build Power (P)">
+      <button class="tool-btn" id="tool-power-line" title="Power Line ($5)">
         <svg viewBox="0 0 24 24"><path d="M7 2v11h3v9l7-12h-4l4-8H7z" /></svg>
       </button>
       <div class="separator"></div>

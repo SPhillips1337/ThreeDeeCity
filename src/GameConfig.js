@@ -17,7 +17,15 @@ export const GameConfig = {
       heavy: 400
     },
     road: 10,
-    bulldoze: 5
+    powerLine: 5,
+    bulldoze: 5,
+    power: {
+      coal: 5000,
+      wind: 1000
+    },
+    water: {
+      pump: 2500
+    }
   },
   
   // Simulation Settings

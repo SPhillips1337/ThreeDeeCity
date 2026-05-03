@@ -341,21 +341,93 @@ body {
 .rci-bar.commercial .bar-fill { background: #3b82f6; }
 .rci-bar.industrial .bar-fill { background: #f59e0b; }
 
-/* Tool Groups */
-.tool-group {
+/* HUD Indicators */
+#hud-indicators {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 12px;
-  padding: 2px;
+  gap: 20px;
+  align-items: center;
 }
 
-.tool-group .tool-btn {
-  width: 44px;
-  height: 32px;
-  font-size: 10px;
+.indicator-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.indicator-group .label {
+  font-size: 9px;
   font-weight: 800;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  letter-spacing: 0.1em;
+}
+
+.meter-bg {
+  width: 100px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.meter-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--accent-primary);
+  transition: width 0.3s ease, background-color 0.3s ease;
+}
+
+.meter-fill.warning { background-color: var(--warning); }
+.meter-fill.danger { background-color: var(--danger); }
+
+/* Tool Categories & Drawers */
+.tool-category {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.category-btn {
+  font-weight: 900 !important;
+  font-size: 18px !important;
+  background: rgba(255, 255, 255, 0.03) !important;
+}
+
+.drawer {
+  position: absolute;
+  left: 60px;
+  top: 0;
+  display: flex;
+  gap: 6px;
+  background: var(--panel-bg);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  padding: 6px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-10px);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.tool-category:hover .drawer,
+.tool-category.active .drawer {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
+}
+
+.drawer .tool-btn {
+  width: 44px;
+  height: 44px;
+  font-size: 11px;
+  font-weight: 800;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.drawer .tool-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
 }
 
 /* Animations */

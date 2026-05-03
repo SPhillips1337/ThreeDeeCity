@@ -9,6 +9,7 @@ export class Tile {
     this.jobs = 0;
     this.developmentLevel = 0; // 0: undeveloped, 1-3: current building level
     this.abandoned = false;
+    this.overlay = null; // e.g., 'power-line'
   }
 
   addModule(module) {
@@ -21,55 +22,100 @@ export class Tile {
       module.simulate(this, city);
     }
     
-    const roadAccess = this.modules.find(m => m.name === 'RoadAccess')?.hasAccess;
-
     // Simulation logic based on type
     if (this.type === 'residential') {
-      this.simulateResidential(city, roadAccess);
-    } else if (this.type === 'commercial' || this.type === 'industrial') {
-      this.simulateEmployment(city, roadAccess);
+      this.simulateResidential(city);
+    } else if (this.type === 'commercial') {
+      this.simulateCommercial(city);
+    } else if (this.type === 'industrial') {
+      this.simulateIndustrial(city);
     }
   }
 
-  simulateResidential(city, roadAccess) {
-    if (roadAccess && !this.abandoned) {
-      // Growth logic
-      if (Math.random() > 0.7) { // Growth chance
-        const maxPop = this.density * 50; // Max pop based on density
-        if (this.residents < maxPop) {
-          this.residents += Math.floor(Math.random() * 5) + 1;
-          this.updateDevelopmentLevel();
-        }
+  simulateResidential(city) {
+    const roadAccess = this.modules.find(m => m.name === 'RoadAccess');
+    const power = this.modules.find(m => m.name === 'Power');
+    const water = this.modules.find(m => m.name === 'Water');
+
+    if (!roadAccess || !roadAccess.hasAccess) {
+      if (this.residents > 0) {
+        console.log(`Tile at ${this.x},${this.y} lost road access!`);
       }
-    } else if (!roadAccess && this.residents > 0) {
-      // Abandonment
-      if (Math.random() > 0.9) {
-        this.residents = Math.max(0, this.residents - 5);
-        if (this.residents === 0) {
-          this.developmentLevel = 0;
-          this.abandoned = true;
-        }
-      }
+      this.abandoned = true;
+      this.residents = 0;
+      this.developmentLevel = 0;
+      return;
+    }
+
+    // Require Power/Water for development > 0
+    const hasInfrastructure = power.hasPower && water.hasWater;
+
+    if (this.developmentLevel > 0 && !hasInfrastructure) {
+      this.abandoned = true;
+      this.residents *= 0.9;
+      if (this.residents < 1) this.developmentLevel = 0;
+      return;
+    }
+
+    this.abandoned = false;
+    const capacity = Math.pow(this.density, 2) * 50;
+    
+    if (this.residents < capacity && hasInfrastructure) {
+      // Aggressive growth for testing
+      const growth = 5 + Math.random() * 5; 
+      this.residents += growth;
+      console.log(`Tile at ${this.x},${this.y} growing: ${this.residents.toFixed(1)}`);
+    }
+
+    // Level up based on population
+    if (this.residents > capacity * 0.8 && this.developmentLevel < 3) {
+      this.developmentLevel++;
     }
   }
 
-  simulateEmployment(city, roadAccess) {
-    if (roadAccess && !this.abandoned) {
-      if (Math.random() > 0.8) {
-        const maxJobs = this.density * 30;
-        if (this.jobs < maxJobs) {
-          this.jobs += Math.floor(Math.random() * 3) + 1;
-          this.updateDevelopmentLevel();
-        }
-      }
-    } else if (!roadAccess && this.jobs > 0) {
-      if (Math.random() > 0.9) {
-        this.jobs = Math.max(0, this.jobs - 3);
-        if (this.jobs === 0) {
-          this.developmentLevel = 0;
-          this.abandoned = true;
-        }
-      }
+  simulateCommercial(city) {
+    const roadAccess = this.modules.find(m => m.name === 'RoadAccess');
+    const power = this.modules.find(m => m.name === 'Power');
+    const water = this.modules.find(m => m.name === 'Water');
+
+    if (!roadAccess || !roadAccess.hasAccess || !power.hasPower || !water.hasWater) {
+      this.abandoned = true;
+      this.jobs = 0;
+      this.developmentLevel = 0;
+      return;
+    }
+
+    this.abandoned = false;
+    const capacity = Math.pow(this.density, 2) * 30;
+    if (this.jobs < capacity) {
+      this.jobs += Math.random() * 3;
+    }
+
+    if (this.jobs > capacity * 0.8 && this.developmentLevel < 3) {
+      this.developmentLevel++;
+    }
+  }
+
+  simulateIndustrial(city) {
+    const roadAccess = this.modules.find(m => m.name === 'RoadAccess');
+    const power = this.modules.find(m => m.name === 'Power');
+    const water = this.modules.find(m => m.name === 'Water');
+
+    if (!roadAccess || !roadAccess.hasAccess || !power.hasPower) {
+      this.abandoned = true;
+      this.jobs = 0;
+      this.developmentLevel = 0;
+      return;
+    }
+
+    this.abandoned = false;
+    const capacity = Math.pow(this.density, 2) * 40;
+    if (this.jobs < capacity) {
+      this.jobs += Math.random() * 4;
+    }
+
+    if (this.jobs > capacity * 0.8 && this.developmentLevel < 3) {
+      this.developmentLevel++;
     }
   }
 

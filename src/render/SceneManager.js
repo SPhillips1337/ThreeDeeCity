@@ -116,7 +116,8 @@ export class SceneManager {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
   }
 
-  update(city) {
+  update(city, keys = {}) {
+    this.handleKeyboard(keys);
     this.controls.update();
     
     // Only update objects that actually changed
@@ -132,6 +133,44 @@ export class SceneManager {
     }
 
     this.renderer.render(this.scene, this.camera);
+  }
+
+  handleKeyboard(keys) {
+    const moveSpeed = 0.5;
+    const forward = new THREE.Vector3();
+    const right = new THREE.Vector3();
+
+    this.camera.getWorldDirection(forward);
+    forward.y = 0;
+    forward.normalize();
+
+    right.crossVectors(forward, this.camera.up);
+
+    if (keys['KeyW']) {
+      this.camera.position.addScaledVector(forward, moveSpeed);
+      this.controls.target.addScaledVector(forward, moveSpeed);
+    }
+    if (keys['KeyS']) {
+      this.camera.position.addScaledVector(forward, -moveSpeed);
+      this.controls.target.addScaledVector(forward, -moveSpeed);
+    }
+    if (keys['KeyA']) {
+      this.camera.position.addScaledVector(right, -moveSpeed);
+      this.controls.target.addScaledVector(right, -moveSpeed);
+    }
+    if (keys['KeyD']) {
+      this.camera.position.addScaledVector(right, moveSpeed);
+      this.controls.target.addScaledVector(right, moveSpeed);
+    }
+
+    // Rotation (Q/E)
+    const rotationSpeed = 0.03;
+    if (keys['KeyQ'] || keys['KeyE']) {
+      const offset = this.camera.position.clone().sub(this.controls.target);
+      const angle = keys['KeyQ'] ? rotationSpeed : -rotationSpeed;
+      offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), angle);
+      this.camera.position.copy(this.controls.target).add(offset);
+    }
   }
 
   initObjects(city) {

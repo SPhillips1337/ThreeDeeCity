@@ -38,6 +38,21 @@ confidence: high
 
 
 ## [Success] Protocol V2 Upgrade (pi-mono integration)
-- **Date: 2026-04-27**
+- **Date:** 2026-04-27
 - **Pattern:** Integrated **Steering Awareness**, **Iterative Synthesis**, and **Batch Momentum** patterns from the `pi-mono` toolkit into `AGENTS.md` and system prompts.
 - **Lesson:** Adopting mature agent-loop primitives (like mid-turn steering and iterative context updates) drastically reduces "Drag" and context drift in long-running coding sessions.
+
+## [Success] Layered Infrastructure (Tile Overlays)
+- **Date:** 2026-05-03
+- **Pattern:** Implemented a `tile.overlay` property and refactored `SimObject.js` to render multiple mesh layers (e.g., Power Line mesh on top of Road mesh).
+- **Lesson:** Allows for visual and logical stacking without needing complex multi-tile types or overwriting core tile functionality.
+
+## [Success] Dynamic Power Jumps (2-Tile BFS)
+- **Date:** 2026-05-03
+- **Pattern:** Adjusted the BFS `spreadToAdjacent` logic to run twice for power, effectively allowing a 2-tile connection radius from powered roads/sources.
+- **Lesson:** Improves user experience by removing the friction of manual point-to-point wiring for every single zone, while maintaining the strategic value of the power grid.
+
+## [Failure] Missing State Initialization Crash
+- **Date:** 2026-05-03
+- **Pattern:** Added UI elements referencing `stats.demand` before defining the object in `City.js`. Resulted in a blank page due to a runtime error in the `animate` loop.
+- **Lesson:** Always verify data object shapes in the simulation state before binding them to high-frequency UI/render loops (like `requestAnimationFrame`). Define fallback/default shapes in the constructor.

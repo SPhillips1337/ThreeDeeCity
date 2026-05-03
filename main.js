@@ -17,6 +17,7 @@ class Game {
     this.dragStart = null;
     this.isDragging = false;
     this.selectedDifficulty = 'medium';
+    this.keys = {}; // Track pressed keys
 
     this.init();
   }
@@ -53,10 +54,19 @@ class Game {
 
     // Tool selection
     document.querySelectorAll('.tool-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
+      btn.addEventListener('click', (e) => {
+        // If it's a category button, just toggle drawer (handled by CSS hover/active mostly)
+        // but we want it to stay open if a tool inside is active.
+        if (btn.classList.contains('category-btn')) {
+          const category = btn.closest('.tool-category');
+          const wasActive = category.classList.contains('active');
+          document.querySelectorAll('.tool-category').forEach(c => c.classList.remove('active'));
+          if (!wasActive) category.classList.add('active');
+          return;
+        }
+
         this.activeToolId = btn.id;
+        this.updateToolbarUI();
       });
     });
 
@@ -112,6 +122,9 @@ class Game {
     });
 
     this.updateUI();
+
+    // Setup right-click cancel
+    this.setupEventListeners();
   }
 
   animate(time) {
@@ -124,19 +137,55 @@ class Game {
       this.updateUI();
     }
 
-    this.sceneManager.update(this.city);
+    this.sceneManager.update(this.city, this.keys);
+  }
+
+  setupEventListeners() {
+    // Prevent context menu on game canvas
+    document.getElementById('game-canvas').addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      // Right-click cancels tool
+      this.activeToolId = 'tool-select';
+      this.updateToolbarUI();
+    });
+
+    window.addEventListener('keydown', (e) => {
+      this.keys[e.code] = true;
+    });
+
+    window.addEventListener('keyup', (e) => {
+      this.keys[e.code] = false;
+    });
+  }
+
+  updateToolbarUI() {
+    document.querySelectorAll('.tool-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.id === this.activeToolId);
+    });
+
+    // Also update category button states
+    document.querySelectorAll('.tool-category').forEach(cat => {
+      const hasActiveTool = cat.querySelector(`#${this.activeToolId}`);
+      cat.classList.toggle('active', !!hasActiveTool);
+    });
   }
 
   updateUI() {
+    // Update HUD stats
     document.getElementById('population').innerText = this.city.stats.population.toLocaleString();
-    document.getElementById('money').innerText = `$${this.city.stats.money.toLocaleString()}`;
-    document.getElementById('game-date').innerText = this.city.stats.date.toLocaleDateString(undefined, {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    });
+    document.getElementById('money').innerText = `$${Math.floor(this.city.stats.money).toLocaleString()}`;
+    document.getElementById('game-date').innerText = this.city.stats.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
-    // Update RCI Demand
+    // Power Meter
+    const powerPercent = this.city.stats.powerSupply > 0
+      ? Math.min(100, (this.city.stats.powerDemand / this.city.stats.powerSupply) * 100)
+      : (this.city.stats.powerDemand > 0 ? 100 : 0);
+    const powerMeter = document.getElementById('power-meter-fill');
+    powerMeter.style.width = `${powerPercent}%`;
+    powerMeter.classList.toggle('warning', powerPercent > 80);
+    powerMeter.classList.toggle('danger', powerPercent >= 100);
+
+    // RCI Demand
     this.updateRCIDemand();
   }
 
@@ -144,24 +193,42 @@ class Game {
     const pop = this.city.stats.population;
     const jobs = this.city.stats.jobs;
     
-    // Simple demand formula: 
-    // R demand high if low pop
-    // C/I demand high if high pop but low jobs
-    let rDemand = Math.max(0, 100 - (pop / 10));
-    let cDemand = Math.max(0, (pop / 2) - jobs);
-    let iDemand = Math.max(0, (pop / 3) - jobs);
+    // Improved demand formula:
+    // R demand high if low pop or high jobs
+    let rDemand = 100 - (pop / 20) + (jobs / 10);
+    // C demand high if pop > jobs
+    let cDemand = (pop / 4) - jobs + 20;
+    // I demand high if pop > jobs and low industrial density
+    let iDemand = (pop / 5) - jobs + 30;
 
-    document.getElementById('demand-r').style.height = `${Math.min(100, rDemand)}%`;
-    document.getElementById('demand-c').style.height = `${Math.min(100, cDemand)}%`;
-    document.getElementById('demand-i').style.height = `${Math.min(100, iDemand)}%`;
+    rDemand = Math.max(-100, Math.min(100, rDemand));
+    cDemand = Math.max(-100, Math.min(100, cDemand));
+    iDemand = Math.max(-100, Math.min(100, iDemand));
+
+    const rHeight = Math.max(0, rDemand);
+    const cHeight = Math.max(0, cDemand);
+    const iHeight = Math.max(0, iDemand);
+
+    // Store in city stats for other systems to read
+    this.city.stats.demand.residential = rHeight;
+    this.city.stats.demand.commercial = cHeight;
+    this.city.stats.demand.industrial = iHeight;
+
+    document.getElementById('demand-r').style.height = `${rHeight}%`;
+    document.getElementById('demand-c').style.height = `${cHeight}%`;
+    document.getElementById('demand-i').style.height = `${iHeight}%`;
   }
 
   getToolCost(toolId) {
-    if (toolId.startsWith('tool-residential-')) return GameConfig.costs.residential[toolId.split('-')[2]];
-    if (toolId.startsWith('tool-commercial-')) return GameConfig.costs.commercial[toolId.split('-')[2]];
-    if (toolId.startsWith('tool-industrial-')) return GameConfig.costs.industrial[toolId.split('-')[2]];
+    if (toolId.startsWith('tool-residential')) return GameConfig.costs.residential[toolId.split('-')[2]];
+    if (toolId.startsWith('tool-commercial')) return GameConfig.costs.commercial[toolId.split('-')[2]];
+    if (toolId.startsWith('tool-industrial')) return GameConfig.costs.industrial[toolId.split('-')[2]];
     if (toolId === 'tool-road') return GameConfig.costs.road;
+    if (toolId === 'tool-power-line') return GameConfig.costs.powerLine;
     if (toolId === 'tool-bulldoze') return GameConfig.costs.bulldoze;
+    if (toolId === 'tool-power-coal') return GameConfig.costs.power.coal;
+    if (toolId === 'tool-power-wind') return GameConfig.costs.power.wind;
+    if (toolId === 'tool-water-pump') return GameConfig.costs.water.pump;
     return 0;
   }
 
@@ -172,28 +239,50 @@ class Game {
     const tile = this.city.grid[x][y];
     let changed = false;
 
-    if (this.activeToolId.includes('residential')) {
+    if (this.activeToolId.startsWith('tool-residential')) {
       tile.type = 'residential';
-      tile.density = this.activeToolId.endsWith('light') ? 1 : (this.activeToolId.endsWith('medium') ? 2 : 3);
+      tile.density = this.getDensity(this.activeToolId);
       changed = true;
-    } else if (this.activeToolId.includes('commercial')) {
+    } else if (this.activeToolId.startsWith('tool-commercial')) {
       tile.type = 'commercial';
-      tile.density = this.activeToolId.endsWith('light') ? 1 : (this.activeToolId.endsWith('medium') ? 2 : 3);
+      tile.density = this.getDensity(this.activeToolId);
       changed = true;
-    } else if (this.activeToolId.includes('industrial')) {
+    } else if (this.activeToolId.startsWith('tool-industrial')) {
       tile.type = 'industrial';
-      tile.density = this.activeToolId.endsWith('light') ? 1 : (this.activeToolId.endsWith('medium') ? 2 : 3);
+      tile.density = this.getDensity(this.activeToolId);
       changed = true;
     } else if (this.activeToolId === 'tool-road') {
       tile.type = 'road';
       changed = true;
+    } else if (this.activeToolId === 'tool-power-line') {
+      // Allow placing power lines over roads
+      if (tile.type === 'road') {
+        tile.overlay = 'power-line';
+      } else {
+        tile.type = 'power-line';
+        tile.overlay = null;
+      }
+      changed = true;
     } else if (this.activeToolId === 'tool-bulldoze') {
-      tile.type = 'grass';
-      tile.density = 0;
-      tile.developmentLevel = 0;
-      tile.residents = 0;
-      tile.jobs = 0;
-      tile.abandoned = false;
+      // If there is an overlay, remove it first
+      if (tile.overlay) {
+        tile.overlay = null;
+      } else {
+        tile.type = 'grass';
+        tile.density = 0;
+        tile.residents = 0;
+        tile.jobs = 0;
+        tile.developmentLevel = 0;
+      }
+      changed = true;
+    } else if (this.activeToolId === 'tool-power-coal') {
+      tile.type = 'power-coal';
+      changed = true;
+    } else if (this.activeToolId === 'tool-power-wind') {
+      tile.type = 'power-wind';
+      changed = true;
+    } else if (this.activeToolId === 'tool-water-pump') {
+      tile.type = 'water-pump';
       changed = true;
     }
 
@@ -202,6 +291,13 @@ class Game {
       this.sceneManager.updateTileVisuals(x, y, tile);
       this.updateUI();
     }
+  }
+
+  getDensity(toolId) {
+    if (toolId.includes('light')) return 1;
+    if (toolId.includes('medium')) return 2;
+    if (toolId.includes('heavy')) return 3;
+    return 0;
   }
 
   applyToolToArea(start, end) {

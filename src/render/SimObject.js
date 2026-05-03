@@ -8,38 +8,58 @@ export class SimObject extends THREE.Group {
     this.abandoned = tile.abandoned;
     this.position.set(tile.x - 16 + 0.5, 0, tile.y - 16 + 0.5);
     
-    this.mesh = null;
+    this.mainMesh = null;
+    this.overlayMesh = null;
     this.updateMesh();
   }
 
   updateMesh() {
-    // Remove old mesh and geometry/material to free memory
-    if (this.mesh) {
-      this.mesh.geometry.dispose();
-      this.mesh.material.dispose();
-      this.remove(this.mesh);
+    // Clear all existing meshes
+    while(this.children.length > 0) { 
+      const obj = this.children[0];
+      if (obj.geometry) obj.geometry.dispose();
+      if (obj.material) obj.material.dispose();
+      this.remove(obj); 
     }
 
-    if (this.tile.type === 'grass') return;
+    // 1. Render Main Tile
+    if (this.tile.type !== 'grass') {
+      const geometry = this.getGeometry(this.tile.type);
+      const material = this.getMaterial(this.tile.type);
+      
+      this.mainMesh = new THREE.Mesh(geometry, material);
+      this.mainMesh.castShadow = true;
+      this.mainMesh.receiveShadow = true;
+      this.mainMesh.position.y = geometry.parameters.height / 2 + 0.01;
+      this.add(this.mainMesh);
+    }
 
-    const geometry = this.getGeometry();
-    const material = this.getMaterial();
-    
-    this.mesh = new THREE.Mesh(geometry, material);
-    this.mesh.castShadow = true;
-    this.mesh.receiveShadow = true;
-    
-    // Position mesh above ground
-    this.mesh.position.y = geometry.parameters.height / 2 + 0.05;
-    
-    this.add(this.mesh);
+    // 2. Render Overlay (e.g. Power Line over Road)
+    if (this.tile.overlay === 'power-line') {
+      const geometry = new THREE.BoxGeometry(0.1, 1.2, 0.1);
+      const material = new THREE.MeshPhongMaterial({ color: 0xaaaaaa });
+      
+      this.overlayMesh = new THREE.Mesh(geometry, material);
+      this.overlayMesh.castShadow = true;
+      this.overlayMesh.position.y = geometry.parameters.height / 2 + 0.05;
+      this.add(this.overlayMesh);
+    }
   }
 
-  getGeometry() {
+
+  getGeometry(type = this.tile.type) {
     const level = this.tile.developmentLevel || 0;
-    switch (this.tile.type) {
+    switch (type) {
       case 'road':
         return new THREE.BoxGeometry(1, 0.1, 1);
+      case 'power-line':
+        return new THREE.BoxGeometry(0.1, 1.2, 0.1);
+      case 'power-coal':
+        return new THREE.BoxGeometry(2, 2, 2);
+      case 'power-wind':
+        return new THREE.BoxGeometry(0.2, 3, 0.2);
+      case 'water-pump':
+        return new THREE.BoxGeometry(1, 0.8, 1);
       case 'residential':
         if (level === 0) return new THREE.BoxGeometry(0.9, 0.05, 0.9); // Zoned but empty
         return new THREE.BoxGeometry(0.8, 0.5 + level * 0.5, 0.8);
@@ -54,7 +74,7 @@ export class SimObject extends THREE.Group {
     }
   }
 
-  getMaterial() {
+  getMaterial(type = this.tile.type) {
     if (this.tile.abandoned) {
       return new THREE.MeshPhongMaterial({ color: 0x555555 });
     }
@@ -62,15 +82,36 @@ export class SimObject extends THREE.Group {
     const level = this.tile.developmentLevel || 0;
     const opacity = level === 0 ? 0.3 : 1.0;
 
-    switch (this.tile.type) {
+    // Infrastructure status colors
+    const hasPower = this.tile.power ? this.tile.power.hasPower : true;
+    const hasWater = this.tile.water ? this.tile.water.hasWater : true;
+
+    switch (type) {
       case 'road':
         return new THREE.MeshPhongMaterial({ color: 0x333333 });
+      case 'power-line':
+        return new THREE.MeshPhongMaterial({ color: 0x8b4513 });
+      case 'power-coal':
+        return new THREE.MeshPhongMaterial({ color: 0x222222 });
+      case 'power-wind':
+        return new THREE.MeshPhongMaterial({ color: 0xeeeeee });
+      case 'water-pump':
+        return new THREE.MeshPhongMaterial({ color: 0x3b82f6 });
       case 'residential':
-        return new THREE.MeshPhongMaterial({ color: 0x4ade80, transparent: level === 0, opacity });
+        let rColor = 0x4ade80;
+        if (!hasPower) rColor = 0xef4444; // Red for no power
+        else if (!hasWater) rColor = 0xf59e0b; // Orange for no water
+        return new THREE.MeshPhongMaterial({ color: rColor, transparent: level === 0, opacity });
       case 'commercial':
-        return new THREE.MeshPhongMaterial({ color: 0x60a5fa, transparent: level === 0, opacity });
+        let cColor = 0x60a5fa;
+        if (!hasPower) cColor = 0xef4444;
+        else if (!hasWater) cColor = 0xf59e0b;
+        return new THREE.MeshPhongMaterial({ color: cColor, transparent: level === 0, opacity });
       case 'industrial':
-        return new THREE.MeshPhongMaterial({ color: 0xfacc15, transparent: level === 0, opacity });
+        let iColor = 0xfacc15;
+        if (!hasPower) iColor = 0xef4444;
+        else if (!hasWater) iColor = 0xf59e0b;
+        return new THREE.MeshPhongMaterial({ color: iColor, transparent: level === 0, opacity });
       default:
         return new THREE.MeshPhongMaterial({ color: 0x1a1a1a, transparent: true, opacity: 0 });
     }
