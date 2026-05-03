@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { SceneManager } from './src/render/SceneManager.js';
 import { City } from './src/sim/City.js';
+import { GameConfig } from './src/GameConfig.js';
 
 class Game {
   constructor() {
@@ -10,22 +11,44 @@ class Game {
     this.activeToolId = 'tool-select';
     this.lastTickTime = 0;
     this.tickInterval = 1000;
-    this.isPaused = false;
+    this.isPaused = true; // Start paused for setup
     this.timeScale = 1;
 
     this.dragStart = null;
     this.isDragging = false;
+    this.selectedDifficulty = 'medium';
 
     this.init();
   }
 
   init() {
-    // Start rendering
     this.animate();
 
-    // Setup window resize
     window.addEventListener('resize', () => {
       this.sceneManager.onResize();
+    });
+
+    // Setup Overlay
+    const setupOverlay = document.getElementById('setup-overlay');
+    const startBtn = document.getElementById('start-game-btn');
+    
+    document.querySelectorAll('.diff-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        this.selectedDifficulty = btn.dataset.difficulty;
+      });
+    });
+
+    startBtn.addEventListener('click', () => {
+      const cityName = document.getElementById('input-city-name').value || 'New Horizon';
+      this.city.name = cityName;
+      this.city.setDifficulty(this.selectedDifficulty);
+      
+      document.getElementById('city-name').innerText = cityName;
+      setupOverlay.style.display = 'none';
+      this.isPaused = false;
+      this.updateUI();
     });
 
     // Tool selection
@@ -51,19 +74,19 @@ class Game {
       this.updateTimeUI('time-fast');
     });
 
-    // Click on canvas
-    document.getElementById('game-canvas').addEventListener('mousedown', (e) => {
-      if (e.button !== 0) return;
+    // Canvas Events
+    const canvas = document.getElementById('game-canvas');
+    canvas.addEventListener('mousedown', (e) => {
+      if (e.button !== 0 || this.isPaused) return;
       const pos = this.sceneManager.getGridPosition(e);
       if (pos) {
         this.isDragging = true;
         this.dragStart = pos;
-        // Apply immediately on mousedown for instant feedback
         this.applyTool(pos.x, pos.y);
       }
     });
 
-    document.getElementById('game-canvas').addEventListener('mouseup', (e) => {
+    canvas.addEventListener('mouseup', (e) => {
       if (e.button !== 0 || !this.isDragging) return;
       const pos = this.sceneManager.getGridPosition(e);
       if (pos) {
@@ -74,8 +97,7 @@ class Game {
       this.sceneManager.clearPreview();
     });
 
-    // Mouse move on canvas
-    document.getElementById('game-canvas').addEventListener('mousemove', (e) => {
+    canvas.addEventListener('mousemove', (e) => {
       const pos = this.sceneManager.getGridPosition(e);
       if (pos) {
         this.sceneManager.updateSelection(pos);
@@ -89,16 +111,12 @@ class Game {
       }
     });
 
-    // Initial stats update
     this.updateUI();
-
-    console.log('ThreeDeeCity Initialized');
   }
 
   animate(time) {
     requestAnimationFrame((t) => this.animate(t));
 
-    // Update simulation
     const effectiveInterval = this.tickInterval / this.timeScale;
     if (!this.isPaused && (time - this.lastTickTime > effectiveInterval)) {
       this.city.simulate();
@@ -106,7 +124,6 @@ class Game {
       this.updateUI();
     }
 
-    // Render scene
     this.sceneManager.update(this.city);
   }
 
@@ -118,31 +135,73 @@ class Game {
       day: 'numeric',
       year: 'numeric'
     });
+
+    // Update RCI Demand
+    this.updateRCIDemand();
+  }
+
+  updateRCIDemand() {
+    const pop = this.city.stats.population;
+    const jobs = this.city.stats.jobs;
+    
+    // Simple demand formula: 
+    // R demand high if low pop
+    // C/I demand high if high pop but low jobs
+    let rDemand = Math.max(0, 100 - (pop / 10));
+    let cDemand = Math.max(0, (pop / 2) - jobs);
+    let iDemand = Math.max(0, (pop / 3) - jobs);
+
+    document.getElementById('demand-r').style.height = `${Math.min(100, rDemand)}%`;
+    document.getElementById('demand-c').style.height = `${Math.min(100, cDemand)}%`;
+    document.getElementById('demand-i').style.height = `${Math.min(100, iDemand)}%`;
+  }
+
+  getToolCost(toolId) {
+    if (toolId.startsWith('tool-residential-')) return GameConfig.costs.residential[toolId.split('-')[2]];
+    if (toolId.startsWith('tool-commercial-')) return GameConfig.costs.commercial[toolId.split('-')[2]];
+    if (toolId.startsWith('tool-industrial-')) return GameConfig.costs.industrial[toolId.split('-')[2]];
+    if (toolId === 'tool-road') return GameConfig.costs.road;
+    if (toolId === 'tool-bulldoze') return GameConfig.costs.bulldoze;
+    return 0;
   }
 
   applyTool(x, y) {
+    const cost = this.getToolCost(this.activeToolId);
+    if (this.city.stats.money < cost) return;
+
     const tile = this.city.grid[x][y];
-    switch (this.activeToolId) {
-      case 'tool-residential':
-        tile.type = 'residential';
-        break;
-      case 'tool-commercial':
-        tile.type = 'commercial';
-        break;
-      case 'tool-industrial':
-        tile.type = 'industrial';
-        break;
-      case 'tool-road':
-        tile.type = 'road';
-        break;
-      case 'tool-bulldoze':
-        tile.type = 'grass';
-        tile.level = 0;
-        tile.residents = 0;
-        break;
+    let changed = false;
+
+    if (this.activeToolId.includes('residential')) {
+      tile.type = 'residential';
+      tile.density = this.activeToolId.endsWith('light') ? 1 : (this.activeToolId.endsWith('medium') ? 2 : 3);
+      changed = true;
+    } else if (this.activeToolId.includes('commercial')) {
+      tile.type = 'commercial';
+      tile.density = this.activeToolId.endsWith('light') ? 1 : (this.activeToolId.endsWith('medium') ? 2 : 3);
+      changed = true;
+    } else if (this.activeToolId.includes('industrial')) {
+      tile.type = 'industrial';
+      tile.density = this.activeToolId.endsWith('light') ? 1 : (this.activeToolId.endsWith('medium') ? 2 : 3);
+      changed = true;
+    } else if (this.activeToolId === 'tool-road') {
+      tile.type = 'road';
+      changed = true;
+    } else if (this.activeToolId === 'tool-bulldoze') {
+      tile.type = 'grass';
+      tile.density = 0;
+      tile.developmentLevel = 0;
+      tile.residents = 0;
+      tile.jobs = 0;
+      tile.abandoned = false;
+      changed = true;
     }
-    // Update visuals
-    this.sceneManager.updateTileVisuals(x, y, tile);
+
+    if (changed) {
+      this.city.stats.money -= cost;
+      this.sceneManager.updateTileVisuals(x, y, tile);
+      this.updateUI();
+    }
   }
 
   applyToolToArea(start, end) {
@@ -152,19 +211,14 @@ class Game {
     const maxY = Math.max(start.y, end.y);
 
     if (this.activeToolId === 'tool-road') {
-      // For roads, we often draw in a line (H or V)
-      // For simplicity, we'll draw a "L" shape or just fill the rect if small
-      // SimCity style: draw along the primary axis of drag
       const dx = Math.abs(end.x - start.x);
       const dy = Math.abs(end.y - start.y);
-
       if (dx > dy) {
         for (let x = minX; x <= maxX; x++) this.applyTool(x, start.y);
       } else {
         for (let y = minY; y <= maxY; y++) this.applyTool(start.x, y);
       }
-    } else {
-      // Area zoning
+    } else if (this.activeToolId !== 'tool-select') {
       for (let x = minX; x <= maxX; x++) {
         for (let y = minY; y <= maxY; y++) {
           this.applyTool(x, y);
@@ -188,7 +242,6 @@ class Game {
   }
 }
 
-// Start the game
 window.addEventListener('DOMContentLoaded', () => {
   new Game();
 });

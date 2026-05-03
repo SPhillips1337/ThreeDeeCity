@@ -13,6 +13,12 @@ confidence: high
 - **Date:** 2026-05-02
 - **Pattern:** Initialized the project with the Anti-Gravity Prompt Protocol from the remote origin. Established semantic, episodic, and procedural memory segments before writing source code.
 - **Lesson:** Starting with a formal memory structure allows the agent to "know" the project's intent and history from Day 1, preventing context amnesia and reducing "Drag".
+ 
++## [Success] Strategic Renaming to ThreeDeeCity
++- **Date:** 2026-05-02
++- **Pattern:** Renamed the project from `SimCity` to `ThreeDeeCity` after initial MVP development. Updated all UI strings, package names, and LTM records simultaneously.
++- **Lesson:** Proactively addressing naming/branding issues early prevents legal friction (trademark) and clarifies the project's unique technical identity (3D web simulation).
++
 
 
 ## [Success] Protocol Initialization

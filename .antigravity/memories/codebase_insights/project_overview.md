@@ -7,16 +7,18 @@ blast_radius: [project-root]
 confidence: high
 ---
 
-# Project Overview: SimCity
+# Project Overview: ThreeDeeCity
 
 ## Purpose
-SimCity is a simulation project (presumably a city builder or similar system) designed to leverage the Anti-Gravity Development Protocol for high-velocity iteration.
+ThreeDeeCity is a 3D city-building simulation project designed for the web. It leverages the Anti-Gravity Development Protocol to maintain high velocity while implementing complex Three.js rendering and modular simulation logic.
 
 ## Core Modules
-- **LTM System**: Initialized and active.
-- **Protocol**: Anti-Gravity Agents Prompt Protocol (V2).
+- **Rendering Engine**: Three.js based `SceneManager` with support for 3D grid display, zoning previews, and interactive selection.
+- **Simulation Engine**: Modular tile-based city simulation with road-access logic and resource tracking (population, money, date).
+- **LTM System**: Active memory management in `.antigravity/memories/`.
 
 ## Hidden Knowledge & Context
-- The project is currently in the "Bootstrap" phase.
-- No source code has been written yet. The goal is to establish a robust foundation before building core features.
-- Future modules will likely include procedural generation, state management, and UI systems.
+- The project has moved past the initial "Bootstrap" phase and has a functional MVP with rendering and simulation.
+- Zoning follows an "RCI" (Residential, Commercial, Industrial) model.
+- Roads are the primary connective infrastructure and are required for zone growth via the `RoadAccessModule`.
+- Future goals include expanded infrastructure (Power, Water), more complex simulation agents, and advanced visual effects.

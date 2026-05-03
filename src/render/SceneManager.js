@@ -125,7 +125,7 @@ export class SceneManager {
         const tile = city.grid[x][y];
         const obj = this.objects[x][y];
         
-        if (obj && obj.level !== tile.level) {
+        if (obj && (obj.developmentLevel !== tile.developmentLevel || obj.abandoned !== tile.abandoned)) {
           this.updateTileVisuals(x, y, tile);
         }
       }
@@ -178,6 +178,7 @@ export class SceneManager {
   updatePreviewSingle(pos, toolId) {
     this.clearPreview();
     const preview = this.createPreviewMesh(toolId);
+    if (!preview) return;
     preview.position.set(pos.x - 16 + 0.5, 0.05, pos.y - 16 + 0.5);
     this.previewGroup.add(preview);
   }
@@ -209,15 +210,18 @@ export class SceneManager {
 
   addPreviewAt(x, y, toolId) {
     const preview = this.createPreviewMesh(toolId);
+    if (!preview) return;
     preview.position.set(x - 16 + 0.5, 0.05, y - 16 + 0.5);
     this.previewGroup.add(preview);
   }
 
   createPreviewMesh(toolId) {
+    if (toolId === 'tool-select') return null;
+
     let color = 0xffffff;
-    if (toolId === 'tool-residential') color = 0x4ade80;
-    if (toolId === 'tool-commercial') color = 0x60a5fa;
-    if (toolId === 'tool-industrial') color = 0xfacc15;
+    if (toolId.includes('residential')) color = 0x4ade80;
+    if (toolId.includes('commercial')) color = 0x60a5fa;
+    if (toolId.includes('industrial')) color = 0xfacc15;
     if (toolId === 'tool-road') color = 0x444444;
     if (toolId === 'tool-bulldoze') color = 0xef4444;
 
