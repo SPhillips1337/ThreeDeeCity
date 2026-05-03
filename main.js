@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { SceneManager } from './src/render/SceneManager.js';
 import { City } from './src/sim/City.js';
 import { GameConfig } from './src/GameConfig.js';
+import { AudioManager } from './src/AudioManager.js';
 
 class Game {
   constructor() {
@@ -18,6 +19,7 @@ class Game {
     this.isDragging = false;
     this.selectedDifficulty = 'medium';
     this.keys = {}; // Track pressed keys
+    this.audioManager = new AudioManager();
 
     this.init();
   }
@@ -125,6 +127,23 @@ class Game {
 
     // Setup right-click cancel
     this.setupEventListeners();
+    
+    // Audio Toggle
+    const audioBtn = document.getElementById('audio-toggle');
+    audioBtn.addEventListener('click', () => {
+      const isMuted = this.audioManager.toggleMute();
+      audioBtn.classList.toggle('active', !isMuted);
+      // Update icon based on mute state
+      const iconPath = isMuted 
+        ? "M16.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77zM3 9v6h4l5 5V4L7 9H3z"
+        : "M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z";
+      document.getElementById('audio-icon').querySelector('path').setAttribute('d', iconPath);
+    });
+
+    // Start audio on first interaction if possible
+    window.addEventListener('click', () => {
+      this.audioManager.init();
+    }, { once: true });
   }
 
   animate(time) {
