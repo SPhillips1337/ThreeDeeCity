@@ -63,9 +63,6 @@ export class PowerModule extends SimModule {
   simulate(tile, city) {
     // Read from city's power grid state
     this.hasPower = city.powerGrid[tile.x][tile.y] || false;
-    if (this.hasPower && Math.random() > 0.999) {
-       console.log(`Tile at ${tile.x},${tile.y} has POWER`);
-    }
   }
 }
 
@@ -79,8 +76,5 @@ export class WaterModule extends SimModule {
   simulate(tile, city) {
     // Read from city's water grid state
     this.hasWater = city.waterGrid[tile.x][tile.y] || false;
-    if (this.hasWater && Math.random() > 0.999) {
-       console.log(`Tile at ${tile.x},${tile.y} has WATER`);
-    }
   }
 }

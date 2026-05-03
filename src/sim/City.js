@@ -84,13 +84,13 @@ export class City {
         this.waterGrid[x][y] = false;
 
         // Supply
-        if (tile.type === 'power-coal') this.stats.powerSupply += 500;
-        if (tile.type === 'power-wind') this.stats.powerSupply += 100;
+        if (tile.type === 'power-coal') this.stats.powerSupply += 2000;
+        if (tile.type === 'power-wind') this.stats.powerSupply += 500;
         
         // Demand
-        if (tile.type === 'residential') this.stats.powerDemand += tile.residents * 0.5;
-        if (tile.type === 'commercial') this.stats.powerDemand += tile.jobs * 1.0;
-        if (tile.type === 'industrial') this.stats.powerDemand += tile.jobs * 1.5;
+        if (tile.type === 'residential') this.stats.powerDemand += tile.residents * 0.2;
+        if (tile.type === 'commercial') this.stats.powerDemand += tile.jobs * 0.5;
+        if (tile.type === 'industrial') this.stats.powerDemand += tile.jobs * 1.0;
       }
     }
 
