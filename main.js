@@ -302,8 +302,30 @@ class Game {
       }
       changed = true;
     } else if (this.activeToolId === 'tool-power-coal') {
-      tile.type = 'power-coal';
-      changed = true;
+      // 2x2 building, Top-Right anchor is (x, y)
+      // Tiles: (x, y), (x-1, y), (x, y-1), (x-1, y-1)
+      if (x > 0 && y > 0) {
+        const lotId = `lot-coal-${x}-${y}-${Date.now()}`;
+        const tiles = [
+          this.city.grid[x][y],
+          this.city.grid[x-1][y],
+          this.city.grid[x][y-1],
+          this.city.grid[x-1][y-1]
+        ];
+
+        // Check if any are occupied
+        if (tiles.every(t => t.type === 'grass')) {
+          tiles.forEach((t, i) => {
+            t.type = 'power-coal';
+            t.lotId = lotId;
+            t.isAnchor = (i === 3); // Bottom-left is anchor for SimObject centering
+            t.lotSize = { w: 2, h: 2 };
+          });
+          // Update all 4 visuals
+          tiles.forEach(t => this.sceneManager.updateTileVisuals(t.x, t.y, t));
+          changed = true;
+        }
+      }
     } else if (this.activeToolId === 'tool-power-wind') {
       tile.type = 'power-wind';
       changed = true;

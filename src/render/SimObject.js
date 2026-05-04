@@ -125,9 +125,8 @@ export class SimObject extends THREE.Group {
   }
 
   _createSkyscraper(type, w, h, level, density, style, material) {
-    // Heavy Skyscrapers can be very tall
-    const baseHeight = type === 'commercial' ? 5 : 4;
-    const totalHeight = (baseHeight + level * 3) * (density / 2);
+    const baseHeight = type === 'commercial' ? 2.5 : 2.0;
+    const totalHeight = (baseHeight + level * 1.5) * (density / 2);
     const tiers = w > 1 ? 3 : 2;
     
     for (let i = 0; i < tiers; i++) {
@@ -236,7 +235,15 @@ export class SimObject extends THREE.Group {
 
   _getMaterial(type, isLot = false) {
     if (this.tile.abandoned) return new THREE.MeshPhongMaterial({ color: 0x555555 });
-    const colors = { residential: 0x4ade80, commercial: 0x60a5fa, industrial: 0xfacc15, road: 0x333333 };
+    const colors = { 
+      residential: 0x4ade80, 
+      commercial: 0x60a5fa, 
+      industrial: 0xfacc15, 
+      road: 0x333333,
+      'power-coal': 0x222222,
+      'power-wind': 0xdddddd,
+      'water-pump': 0x3b82f6
+    };
     let color = colors[type] || 0x888888;
     return new THREE.MeshPhongMaterial({ color, transparent: isLot, opacity: isLot ? 0.4 : 1.0 });
   }

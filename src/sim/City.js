@@ -268,8 +268,9 @@ export class City {
         // Check demand
         if (this.stats.demand[anchor.type] < 20) continue;
 
-        // Verify rectangle is uniform and available
+        // Verify rectangle is uniform, available, and HAS ROAD ACCESS
         let canMerge = true;
+        let hasAccess = false;
         for (let ix = x; ix < x + w; ix++) {
           for (let iy = y; iy < y + h; iy++) {
             const t = this.grid[ix][iy];
@@ -277,11 +278,12 @@ export class City {
               canMerge = false;
               break;
             }
+            if (this.roadAccessGrid[ix][iy]) hasAccess = true;
           }
           if (!canMerge) break;
         }
 
-        if (canMerge) {
+        if (canMerge && hasAccess) {
           const lotId = `lot-${x}-${y}-${Date.now()}`;
           anchor.lotId = lotId;
           anchor.lotSize = { w, h };
