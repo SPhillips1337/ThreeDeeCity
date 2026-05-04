@@ -7,6 +7,9 @@ import { AudioManager } from './src/AudioManager.js';
 class Game {
   constructor() {
     this.city = new City(32, 32);
+    this.city.onTileChanged = (x, y, tile) => {
+      this.sceneManager.updateTileVisuals(x, y, tile);
+    };
     this.sceneManager = new SceneManager(this.city);
 
     this.activeToolId = 'tool-select';
@@ -261,6 +264,11 @@ class Game {
 
     const tile = this.city.grid[x][y];
     let changed = false;
+
+    // Reset lot properties when applying new tools
+    tile.lotId = null;
+    tile.isAnchor = true;
+    tile.lotSize = { w: 1, h: 1 };
 
     if (this.activeToolId.startsWith('tool-residential')) {
       tile.type = 'residential';

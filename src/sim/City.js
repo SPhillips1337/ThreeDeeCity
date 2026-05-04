@@ -25,6 +25,7 @@ export class City {
     this.taxRates = { ...GameConfig.taxRates };
     this.monthlyExpenses = 0;
 
+    this.onTileChanged = null;
     this.init();
   }
 
@@ -61,11 +62,13 @@ export class City {
     this.updateInfrastructureGrids();
     this.updateTraffic();
 
-    // Monthly budget and lot consolidation
+    // Budget and lot consolidation
     if (this.stats.date.getDate() === 1) {
       this.processMonthlyBudget();
-      this.consolidateLots();
     }
+
+    // Frequent consolidation check for responsiveness
+    this.consolidateLots();
 
     for (let x = 0; x < this.size.width; x++) {
       for (let y = 0; y < this.size.height; y++) {
@@ -146,9 +149,9 @@ export class City {
     
     this.runBFS(roads, this.roadAccessGrid, (tile) => {
       // Access spreads from roads into adjacent zones of the same type
-      // We allow it to spread into RCI zones up to a depth of 4 tiles
+      // We allow it to spread into RCI zones up to a depth of 8 tiles
       return ['residential', 'commercial', 'industrial'].includes(tile.type);
-    }, 4); 
+    }, 8); 
   }
 
   runBFS(sources, grid, canSpreadFunc, maxDistance = 100) {
@@ -258,15 +261,15 @@ export class City {
   }
 
   _scanForLots(w, h, minDensity) {
-    for (let x = 0; x < this.size.width - w; x++) {
-      for (let y = 0; y < this.size.height - h; y++) {
+    for (let x = 0; x <= this.size.width - w; x++) {
+      for (let y = 0; y <= this.size.height - h; y++) {
         const anchor = this.grid[x][y];
         if (!anchor.isAnchor || anchor.lotSize.w > 1) continue;
         if (anchor.density < minDensity) continue;
         if (anchor.type === 'grass' || anchor.type === 'road') continue;
 
-        // Check demand
-        if (this.stats.demand[anchor.type] < 20) continue;
+        // Check demand - be more aggressive (threshold 5)
+        if (this.stats.demand[anchor.type] < 5) continue;
 
         // Verify rectangle is uniform, available, and HAS ROAD ACCESS
         let canMerge = true;
@@ -301,8 +304,10 @@ export class City {
               t.residents = 0;
               t.jobs = 0;
               t.developmentLevel = 0;
+              if (this.onTileChanged) this.onTileChanged(ix, iy, t);
             }
           }
+          if (this.onTileChanged) this.onTileChanged(x, y, anchor);
           // Log success for visibility
           console.log(`Merged ${w}x${h} ${anchor.type} lot at ${x},${y}`);
         }
