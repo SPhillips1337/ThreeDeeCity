@@ -255,6 +255,11 @@ class Game {
     if (toolId === 'tool-bus-stop') return GameConfig.costs.transit.busStop;
     if (toolId === 'tool-rail-line') return GameConfig.costs.transit.railLine;
     if (toolId === 'tool-rail-station') return GameConfig.costs.transit.railStation;
+    if (toolId === 'tool-police') return GameConfig.costs.civic.policeStation;
+    if (toolId === 'tool-fire') return GameConfig.costs.civic.fireStation;
+    if (toolId === 'tool-school') return GameConfig.costs.civic.school;
+    if (toolId === 'tool-hospital') return GameConfig.costs.civic.hospital;
+    if (toolId === 'tool-park') return GameConfig.costs.civic.park;
     return 0;
   }
 
@@ -348,6 +353,21 @@ class Game {
       changed = true;
     } else if (this.activeToolId === 'tool-rail-station') {
       tile.type = 'rail-station';
+      changed = true;
+    } else if (this.activeToolId === 'tool-police') {
+      tile.type = 'police';
+      changed = true;
+    } else if (this.activeToolId === 'tool-fire') {
+      tile.type = 'fire';
+      changed = true;
+    } else if (this.activeToolId === 'tool-school') {
+      tile.type = 'school';
+      changed = true;
+    } else if (this.activeToolId === 'tool-hospital') {
+      tile.type = 'hospital';
+      changed = true;
+    } else if (this.activeToolId === 'tool-park') {
+      tile.type = 'park';
       changed = true;
     }
 

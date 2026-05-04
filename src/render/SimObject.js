@@ -229,6 +229,11 @@ export class SimObject extends THREE.Group {
       case 'power-wind': return new THREE.BoxGeometry(0.3, 3.5, 0.3);
       case 'water-pump': return new THREE.BoxGeometry(1.2, 1, 1.2);
       case 'bus-stop': return new THREE.BoxGeometry(0.4, 0.3, 0.2);
+      case 'police': return new THREE.BoxGeometry(1.5, 1.2, 1.5);
+      case 'fire': return new THREE.BoxGeometry(1.5, 1.2, 1.5);
+      case 'school': return new THREE.BoxGeometry(1.8, 0.8, 1.8);
+      case 'hospital': return new THREE.BoxGeometry(1.8, 2.0, 1.8);
+      case 'park': return new THREE.BoxGeometry(1.8, 0.1, 1.8);
       default: return new THREE.BoxGeometry(0.1, 0.1, 0.1);
     }
   }
@@ -242,7 +247,12 @@ export class SimObject extends THREE.Group {
       road: 0x333333,
       'power-coal': 0x222222,
       'power-wind': 0xdddddd,
-      'water-pump': 0x3b82f6
+      'water-pump': 0x3b82f6,
+      'police': 0x1e3a8a, // dark blue
+      'fire': 0x991b1b, // dark red
+      'school': 0xca8a04, // dark yellow/orange
+      'hospital': 0xf8fafc, // white
+      'park': 0x16a34a // nice green
     };
     let color = colors[type] || 0x888888;
     return new THREE.MeshPhongMaterial({ color, transparent: isLot, opacity: isLot ? 0.4 : 1.0 });
