@@ -279,4 +279,22 @@ export class SimObject extends THREE.Group {
       this.updateMesh();
     }
   }
+
+  updateTrafficColor(congestion) {
+    if (!this.children || this.children.length === 0) return;
+    const mesh = this.children.find(c => c.isMesh && c.material);
+    if (!mesh) return;
+
+    // Base road color: 0x333333 (rgb: 51, 51, 51)
+    // Max congestion color: 0xff0000 (rgb: 255, 0, 0)
+    // Cap congestion at 150 for color scaling
+    const t = Math.min(1.0, congestion / 150);
+    
+    // Lerp from #333333 to #ff0000
+    const r = 51 + (255 - 51) * t;
+    const g = 51 + (0 - 51) * t;
+    const b = 51 + (0 - 51) * t;
+
+    mesh.material.color.setRGB(r / 255, g / 255, b / 255);
+  }
 }

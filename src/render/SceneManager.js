@@ -128,6 +128,11 @@ export class SceneManager {
         
         if (obj && (obj.developmentLevel !== tile.developmentLevel || obj.abandoned !== tile.abandoned)) {
           this.updateTileVisuals(x, y, tile);
+        } else if (obj && (tile.type === 'road' || tile.type === 'highway')) {
+          const traffic = tile.modules.find(m => m.name === 'Traffic');
+          if (traffic) {
+            obj.updateTrafficColor(traffic.congestion);
+          }
         }
       }
     }
