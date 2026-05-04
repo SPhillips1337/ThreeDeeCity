@@ -31,7 +31,22 @@ export const GameConfig = {
       busStop: 500,
       railLine: 100,
       railStation: 3000
+    },
+    civic: {
+      policeStation: 1500,
+      fireStation: 1500,
+      school: 2500,
+      hospital: 4000,
+      park: 800
     }
+  },
+
+  serviceRadius: {
+    policeStation: 12,
+    fireStation: 10,
+    school: 15,
+    hospital: 18,
+    park: 8
   },
   
   // Simulation Settings

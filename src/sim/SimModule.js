@@ -21,23 +21,7 @@ export class RoadAccessModule extends SimModule {
   }
 
   simulate(tile, city) {
-    this.hasAccess = false;
-    const neighbors = [
-      { x: tile.x + 1, y: tile.y },
-      { x: tile.x - 1, y: tile.y },
-      { x: tile.x, y: tile.y + 1 },
-      { x: tile.x, y: tile.y - 1 }
-    ];
- 
-    for (const pos of neighbors) {
-      if (pos.x >= 0 && pos.x < city.size.width && pos.y >= 0 && pos.y < city.size.height) {
-        const neighbor = city.grid[pos.x][pos.y];
-        if (neighbor.type === 'road' || neighbor.type === 'highway') {
-          this.hasAccess = true;
-          break;
-        }
-      }
-    }
+    this.hasAccess = city.roadAccessGrid[tile.x][tile.y] || false;
   }
 }
 

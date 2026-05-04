@@ -11,6 +11,7 @@ export class City {
     this.powerGrid = [];
     this.waterGrid = [];
     this.trafficGrid = [];
+    this.roadAccessGrid = [];
     
     this.stats = {
       population: 0,
@@ -37,6 +38,7 @@ export class City {
       this.powerGrid[x] = [];
       this.waterGrid[x] = [];
       this.trafficGrid[x] = [];
+      this.roadAccessGrid[x] = [];
       for (let y = 0; y < this.size.height; y++) {
         const tile = new Tile(x, y);
         tile.addModule(new RoadAccessModule());
@@ -47,6 +49,7 @@ export class City {
         this.powerGrid[x][y] = false;
         this.waterGrid[x][y] = false;
         this.trafficGrid[x][y] = 0;
+        this.roadAccessGrid[x][y] = false;
       }
     }
   }
@@ -58,9 +61,10 @@ export class City {
     this.updateInfrastructureGrids();
     this.updateTraffic();
 
-    // Monthly budget processing
+    // Monthly budget and lot consolidation
     if (this.stats.date.getDate() === 1) {
       this.processMonthlyBudget();
+      this.consolidateLots();
     }
 
     for (let x = 0; x < this.size.width; x++) {
@@ -111,18 +115,40 @@ export class City {
 
     // 2. Spread infrastructure
     this.runBFS(powerSources, this.powerGrid, (tile) => {
-      // Power spreads through roads, power-related buildings, or power-line overlays
+      // Power spreads through roads, utilities, and powered zones
       return tile.type === 'road' || 
              tile.type === 'power-coal' || 
              tile.type === 'power-wind' || 
              tile.type === 'power-line' ||
-             tile.overlay === 'power-line';
+             tile.overlay === 'power-line' ||
+             ['residential', 'commercial', 'industrial'].includes(tile.type);
     }, 100);
 
     this.runBFS(waterSources, this.waterGrid, (tile) => {
-      // Water spreads through roads and water-related infrastructure
-      return tile.type === 'road' || tile.type === 'water-pump';
+      // Water spreads through roads, pumps, and watered zones
+      return tile.type === 'road' || 
+             tile.type === 'water-pump' ||
+             ['residential', 'commercial', 'industrial'].includes(tile.type);
     }, 100);
+
+    // 3. Spread Road Access (Blocks)
+    const roads = [];
+    for (let x = 0; x < this.size.width; x++) {
+      for (let y = 0; y < this.size.height; y++) {
+        const tile = this.grid[x][y];
+        this.roadAccessGrid[x][y] = false;
+        if (tile.type === 'road' || tile.type === 'highway') {
+          roads.push({ x, y });
+          this.roadAccessGrid[x][y] = true;
+        }
+      }
+    }
+    
+    this.runBFS(roads, this.roadAccessGrid, (tile) => {
+      // Access spreads from roads into adjacent zones of the same type
+      // We allow it to spread into RCI zones up to a depth of 4 tiles
+      return ['residential', 'commercial', 'industrial'].includes(tile.type);
+    }, 4); 
   }
 
   runBFS(sources, grid, canSpreadFunc, maxDistance = 100) {
@@ -211,12 +237,75 @@ export class City {
     let totalJobs = 0;
     for (let x = 0; x < this.size.width; x++) {
       for (let y = 0; y < this.size.height; y++) {
-        totalPop += this.grid[x][y].residents || 0;
-        totalJobs += this.grid[x][y].jobs || 0;
+        const tile = this.grid[x][y];
+        // Multi-tile building population is stored in the anchor
+        if (tile.isAnchor) {
+          totalPop += tile.residents || 0;
+          totalJobs += tile.jobs || 0;
+        }
       }
     }
     this.stats.population = Math.floor(totalPop);
     this.stats.jobs = Math.floor(totalJobs);
+  }
+
+  consolidateLots() {
+    // We scan for 3x3 and 2x2 opportunities
+    // Scan 3x3 (Heavy only)
+    this._scanForLots(3, 3, 3);
+    // Scan 2x2 (Medium and Heavy)
+    this._scanForLots(2, 2, 2);
+  }
+
+  _scanForLots(w, h, minDensity) {
+    for (let x = 0; x < this.size.width - w; x++) {
+      for (let y = 0; y < this.size.height - h; y++) {
+        const anchor = this.grid[x][y];
+        if (!anchor.isAnchor || anchor.lotSize.w > 1) continue;
+        if (anchor.density < minDensity) continue;
+        if (anchor.type === 'grass' || anchor.type === 'road') continue;
+
+        // Check demand
+        if (this.stats.demand[anchor.type] < 20) continue;
+
+        // Verify rectangle is uniform and available
+        let canMerge = true;
+        for (let ix = x; ix < x + w; ix++) {
+          for (let iy = y; iy < y + h; iy++) {
+            const t = this.grid[ix][iy];
+            if (t.type !== anchor.type || t.density !== anchor.density || !t.isAnchor || t.lotSize.w > 1) {
+              canMerge = false;
+              break;
+            }
+          }
+          if (!canMerge) break;
+        }
+
+        if (canMerge) {
+          const lotId = `lot-${x}-${y}-${Date.now()}`;
+          anchor.lotId = lotId;
+          anchor.lotSize = { w, h };
+          anchor.isAnchor = true;
+          // Scale residents/jobs to the new lot capacity (simplified)
+          anchor.residents *= (w * h);
+          anchor.jobs *= (w * h);
+
+          for (let ix = x; ix < x + w; ix++) {
+            for (let iy = y; iy < y + h; iy++) {
+              if (ix === x && iy === y) continue;
+              const t = this.grid[ix][iy];
+              t.lotId = lotId;
+              t.isAnchor = false;
+              t.residents = 0;
+              t.jobs = 0;
+              t.developmentLevel = 0;
+            }
+          }
+          // Log success for visibility
+          console.log(`Merged ${w}x${h} ${anchor.type} lot at ${x},${y}`);
+        }
+      }
+    }
   }
 
   updateTraffic() {

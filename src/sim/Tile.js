@@ -10,6 +10,12 @@ export class Tile {
     this.developmentLevel = 0; // 0: undeveloped, 1-3: current building level
     this.abandoned = false;
     this.overlay = null; // e.g., 'power-line'
+    this.styleId = Math.floor(Math.random() * 4); // 0-3 for visual variety
+    
+    // Lot Consolidation
+    this.lotId = null;
+    this.isAnchor = true;
+    this.lotSize = { w: 1, h: 1 };
   }
 
   addModule(module) {
