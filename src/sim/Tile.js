@@ -43,6 +43,7 @@ export class Tile {
     const power = this.modules.find(m => m.name === 'Power');
     const water = this.modules.find(m => m.name === 'Water');
     const traffic = this.modules.find(m => m.name === 'Traffic');
+    const services = this.modules.find(m => m.name === 'Services');
 
     if (!roadAccess || !roadAccess.hasAccess) {
       this.abandoned = true;
@@ -70,18 +71,43 @@ export class Tile {
     }
 
     this.abandoned = false;
+
+    // Service Impacts
+    let serviceMultiplier = 1.0;
+    let maxLevel = 3;
+    
+    if (services) {
+      if (services.coverage.police) serviceMultiplier += 0.2;
+      if (services.coverage.fire) serviceMultiplier += 0.1;
+      if (services.coverage.park) serviceMultiplier += 0.3; // High desirability
+      
+      // Heavy residential needs school and hospital to reach level 3
+      if (this.density === 3) {
+        if (!services.coverage.school || !services.coverage.hospital) {
+          maxLevel = 2; // Cap development if uneducated/unhealthy
+        } else {
+          serviceMultiplier += 0.4;
+        }
+      }
+    }
+
     const capacity = Math.pow(this.density, 2) * 50;
     
     if (this.residents < capacity && hasInfrastructure) {
-      // Growth slowed by traffic
+      // Growth slowed by traffic, boosted by services
       const trafficPenalty = traffic ? Math.max(0, (traffic.congestion / 100)) : 0;
-      const growth = (5 + Math.random() * 5) * (1 - trafficPenalty); 
+      const growth = (5 + Math.random() * 5) * serviceMultiplier * (1 - trafficPenalty); 
       this.residents += Math.max(0, growth);
     }
 
     // Level up based on population
-    if (this.residents > capacity * 0.8 && this.developmentLevel < 3) {
+    if (this.residents > capacity * 0.8 && this.developmentLevel < maxLevel) {
       this.developmentLevel++;
+    } else if (this.developmentLevel > maxLevel) {
+      // Downgrade if services are lost
+      this.developmentLevel = maxLevel;
+      this.residents = capacity * 0.8;
+      this.abandoned = true; // Temporary abandonment flash
     }
   }
 
@@ -90,6 +116,7 @@ export class Tile {
     const power = this.modules.find(m => m.name === 'Power');
     const water = this.modules.find(m => m.name === 'Water');
     const traffic = this.modules.find(m => m.name === 'Traffic');
+    const services = this.modules.find(m => m.name === 'Services');
 
     if (!roadAccess || !roadAccess.hasAccess || !power.hasPower || !water.hasWater) {
       this.abandoned = true;
@@ -107,14 +134,32 @@ export class Tile {
     }
 
     this.abandoned = false;
+
+    let serviceMultiplier = 1.0;
+    let maxLevel = 3;
+
+    if (services) {
+      if (services.coverage.police) serviceMultiplier += 0.3; // Crime is bad for business
+      else if (this.density >= 2) maxLevel = 2; // Medium/Heavy Commercial needs police
+
+      if (services.coverage.fire) serviceMultiplier += 0.1;
+      else if (this.density === 3) maxLevel = 2; // Heavy commercial needs fire protection
+      
+      if (services.coverage.park) serviceMultiplier += 0.2; // Nice areas attract shoppers
+    }
+
     const capacity = Math.pow(this.density, 2) * 30;
     if (this.jobs < capacity) {
       const trafficPenalty = traffic ? Math.max(0, (traffic.congestion / 80)) : 0;
-      this.jobs += Math.random() * 3 * (1 - trafficPenalty);
+      this.jobs += Math.random() * 3 * serviceMultiplier * (1 - trafficPenalty);
     }
 
-    if (this.jobs > capacity * 0.8 && this.developmentLevel < 3) {
+    if (this.jobs > capacity * 0.8 && this.developmentLevel < maxLevel) {
       this.developmentLevel++;
+    } else if (this.developmentLevel > maxLevel) {
+      this.developmentLevel = maxLevel;
+      this.jobs = capacity * 0.8;
+      this.abandoned = true;
     }
   }
 
@@ -140,14 +185,31 @@ export class Tile {
     }
 
     this.abandoned = false;
+    
+    let maxLevel = 3;
+    let serviceMultiplier = 1.0;
+    const services = this.modules.find(m => m.name === 'Services');
+    
+    if (services) {
+      if (services.coverage.fire) {
+        serviceMultiplier += 0.2;
+      } else if (this.density >= 2) {
+        maxLevel = 2; // Heavy industrial requires fire protection
+      }
+    }
+
     const capacity = Math.pow(this.density, 2) * 40;
     if (this.jobs < capacity) {
       const trafficPenalty = traffic ? Math.max(0, (traffic.congestion / 120)) : 0;
-      this.jobs += Math.random() * 4 * (1 - trafficPenalty);
+      this.jobs += Math.random() * 4 * serviceMultiplier * (1 - trafficPenalty);
     }
 
-    if (this.jobs > capacity * 0.8 && this.developmentLevel < 3) {
+    if (this.jobs > capacity * 0.8 && this.developmentLevel < maxLevel) {
       this.developmentLevel++;
+    } else if (this.developmentLevel > maxLevel) {
+      this.developmentLevel = maxLevel;
+      this.jobs = capacity * 0.8;
+      this.abandoned = true;
     }
   }
 

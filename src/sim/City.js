@@ -1,5 +1,5 @@
 import { Tile } from './Tile.js';
-import { RoadAccessModule, PowerModule, WaterModule, TrafficModule } from './SimModule.js';
+import { RoadAccessModule, PowerModule, WaterModule, TrafficModule, ServiceModule } from './SimModule.js';
 import { GameConfig } from '../GameConfig.js';
 
 export class City {
@@ -12,6 +12,14 @@ export class City {
     this.waterGrid = [];
     this.trafficGrid = [];
     this.roadAccessGrid = [];
+    
+    this.serviceGrids = {
+      police: [],
+      fire: [],
+      school: [],
+      hospital: [],
+      park: []
+    };
     
     this.stats = {
       population: 0,
@@ -40,17 +48,31 @@ export class City {
       this.waterGrid[x] = [];
       this.trafficGrid[x] = [];
       this.roadAccessGrid[x] = [];
+      
+      this.serviceGrids.police[x] = [];
+      this.serviceGrids.fire[x] = [];
+      this.serviceGrids.school[x] = [];
+      this.serviceGrids.hospital[x] = [];
+      this.serviceGrids.park[x] = [];
+
       for (let y = 0; y < this.size.height; y++) {
         const tile = new Tile(x, y);
         tile.addModule(new RoadAccessModule());
         tile.addModule(new PowerModule());
         tile.addModule(new WaterModule());
         tile.addModule(new TrafficModule());
+        tile.addModule(new ServiceModule());
         this.grid[x][y] = tile;
         this.powerGrid[x][y] = false;
         this.waterGrid[x][y] = false;
         this.trafficGrid[x][y] = 0;
         this.roadAccessGrid[x][y] = false;
+
+        this.serviceGrids.police[x][y] = false;
+        this.serviceGrids.fire[x][y] = false;
+        this.serviceGrids.school[x][y] = false;
+        this.serviceGrids.hospital[x][y] = false;
+        this.serviceGrids.park[x][y] = false;
       }
     }
   }
@@ -152,6 +174,49 @@ export class City {
       // We allow it to spread into RCI zones up to a depth of 8 tiles
       return ['residential', 'commercial', 'industrial'].includes(tile.type);
     }, 8); 
+
+    this.updateServiceGrids();
+  }
+
+  updateServiceGrids() {
+    // Reset grids and collect sources
+    const sources = {
+      police: [],
+      fire: [],
+      school: [],
+      hospital: [],
+      park: []
+    };
+
+    for (let x = 0; x < this.size.width; x++) {
+      for (let y = 0; y < this.size.height; y++) {
+        this.serviceGrids.police[x][y] = false;
+        this.serviceGrids.fire[x][y] = false;
+        this.serviceGrids.school[x][y] = false;
+        this.serviceGrids.hospital[x][y] = false;
+        this.serviceGrids.park[x][y] = false;
+
+        const tile = this.grid[x][y];
+        if (tile.type === 'police') sources.police.push({x, y});
+        else if (tile.type === 'fire') sources.fire.push({x, y});
+        else if (tile.type === 'school') sources.school.push({x, y});
+        else if (tile.type === 'hospital') sources.hospital.push({x, y});
+        else if (tile.type === 'park') sources.park.push({x, y});
+      }
+    }
+
+    // Spread services based on their respective radiuses
+    // Services spread via roads (like power/water) but also freely through RCI zones
+    const canSpread = (tile) => {
+      return ['road', 'highway', 'residential', 'commercial', 'industrial'].includes(tile.type) ||
+             ['police', 'fire', 'school', 'hospital', 'park'].includes(tile.type);
+    };
+
+    this.runBFS(sources.police, this.serviceGrids.police, canSpread, GameConfig.serviceRadius.policeStation);
+    this.runBFS(sources.fire, this.serviceGrids.fire, canSpread, GameConfig.serviceRadius.fireStation);
+    this.runBFS(sources.school, this.serviceGrids.school, canSpread, GameConfig.serviceRadius.school);
+    this.runBFS(sources.hospital, this.serviceGrids.hospital, canSpread, GameConfig.serviceRadius.hospital);
+    this.runBFS(sources.park, this.serviceGrids.park, canSpread, GameConfig.serviceRadius.park);
   }
 
   runBFS(sources, grid, canSpreadFunc, maxDistance = 100) {

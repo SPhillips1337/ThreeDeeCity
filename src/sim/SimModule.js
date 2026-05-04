@@ -62,3 +62,25 @@ export class WaterModule extends SimModule {
     this.hasWater = city.waterGrid[tile.x][tile.y] || false;
   }
 }
+
+export class ServiceModule extends SimModule {
+  constructor() {
+    super();
+    this.name = 'Services';
+    this.coverage = {
+      police: false,
+      fire: false,
+      school: false,
+      hospital: false,
+      park: false
+    };
+  }
+
+  simulate(tile, city) {
+    this.coverage.police = city.serviceGrids.police[tile.x][tile.y] || false;
+    this.coverage.fire = city.serviceGrids.fire[tile.x][tile.y] || false;
+    this.coverage.school = city.serviceGrids.school[tile.x][tile.y] || false;
+    this.coverage.hospital = city.serviceGrids.hospital[tile.x][tile.y] || false;
+    this.coverage.park = city.serviceGrids.park[tile.x][tile.y] || false;
+  }
+}
