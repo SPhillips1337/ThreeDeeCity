@@ -373,8 +373,6 @@ export class City {
             }
           }
           if (this.onTileChanged) this.onTileChanged(x, y, anchor);
-          // Log success for visibility
-          console.log(`Merged ${w}x${h} ${anchor.type} lot at ${x},${y}`);
         }
       }
     }
