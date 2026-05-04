@@ -22,6 +22,7 @@ export class SceneManager {
     this.setupGrid(city);
     
     this.objects = []; // 2D array of SimObjects
+    this.currentDataView = 'none';
     this.initObjects(city);
 
     this.selectionMesh = new THREE.Mesh(
@@ -128,10 +129,15 @@ export class SceneManager {
         
         if (obj && (obj.developmentLevel !== tile.developmentLevel || obj.abandoned !== tile.abandoned)) {
           this.updateTileVisuals(x, y, tile);
-        } else if (obj && (tile.type === 'road' || tile.type === 'highway')) {
-          const traffic = tile.modules.find(m => m.name === 'Traffic');
-          if (traffic) {
-            obj.updateTrafficColor(traffic.congestion);
+        } else if (obj) {
+          if (tile.type === 'road' || tile.type === 'highway') {
+            const traffic = tile.modules.find(m => m.name === 'Traffic');
+            if (traffic && this.currentDataView === 'none') {
+              obj.updateTrafficColor(traffic.congestion);
+            }
+          }
+          if (this.currentDataView !== 'none') {
+            this.applyDataViewTint(obj, tile);
           }
         }
       }
@@ -197,6 +203,69 @@ export class SceneManager {
       const obj = new SimObject(tile);
       this.objects[x][y] = obj;
       this.scene.add(obj);
+      this.applyDataViewTint(obj, tile);
+    }
+  }
+
+  setDataView(viewName, city) {
+    this.currentDataView = viewName;
+    for (let x = 0; x < this.objects.length; x++) {
+      for (let y = 0; y < this.objects[x].length; y++) {
+        const obj = this.objects[x][y];
+        const tile = city.grid[x][y];
+        if (obj) {
+          this.applyDataViewTint(obj, tile);
+        }
+      }
+    }
+  }
+
+  applyDataViewTint(obj, tile) {
+    if (!obj.children || obj.children.length === 0) return;
+    const mesh = obj.children.find(c => c.isMesh && c.material);
+    if (!mesh) return;
+
+    // Reset color to base material if view is 'none'
+    if (this.currentDataView === 'none') {
+      // Re-evaluate base color by just letting the object update itself next frame
+      // Or explicitly reset:
+      const baseMat = obj._getMaterial(tile.type, tile.lotSize && (tile.lotSize.w > 1 || tile.lotSize.h > 1));
+      mesh.material.color.copy(baseMat.color);
+      return;
+    }
+
+    let hasCoverage = false;
+    let tintColor = 0x000000;
+
+    if (this.currentDataView === 'power') {
+      const mod = tile.modules.find(m => m.name === 'Power');
+      hasCoverage = mod && mod.hasPower;
+      tintColor = 0xfacc15; // Yellow
+    } else if (this.currentDataView === 'water') {
+      const mod = tile.modules.find(m => m.name === 'Water');
+      hasCoverage = mod && mod.hasWater;
+      tintColor = 0x3b82f6; // Blue
+    } else {
+      // Civic Services
+      const services = tile.modules.find(m => m.name === 'Services');
+      if (services) {
+        hasCoverage = services.coverage[this.currentDataView];
+        const colors = {
+          police: 0x1e3a8a,
+          fire: 0x991b1b,
+          school: 0xca8a04,
+          hospital: 0xf8fafc,
+          park: 0x16a34a
+        };
+        tintColor = colors[this.currentDataView] || 0xffffff;
+      }
+    }
+
+    if (hasCoverage) {
+      mesh.material.color.setHex(tintColor);
+    } else {
+      // Dark grey out buildings without coverage
+      mesh.material.color.setHex(0x555555);
     }
   }
 

@@ -70,6 +70,14 @@ class Game {
           return;
         }
 
+        if (btn.classList.contains('view-btn')) {
+          const view = btn.dataset.view;
+          this.sceneManager.setDataView(view, this.city);
+          document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          return;
+        }
+
         this.activeToolId = btn.id;
         this.updateToolbarUI();
       });
