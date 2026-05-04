@@ -66,3 +66,13 @@ confidence: high
 - **Date:** 2026-05-03
 - **Pattern:** Added UI elements referencing `stats.demand` before defining the object in `City.js`. Resulted in a blank page due to a runtime error in the `animate` loop.
 - **Lesson:** Always verify data object shapes in the simulation state before binding them to high-frequency UI/render loops (like `requestAnimationFrame`). Define fallback/default shapes in the constructor.
+
+## [Success] Decoupled State and Render Sync
+- **Date:** 2026-05-04
+- **Pattern:** The simulation merged lots successfully, but the 3D meshes didn't update because `SceneManager` wasn't notified. Added an `onTileChanged` callback from the simulation core to the render engine.
+- **Lesson:** When altering properties on multiple sub-objects simultaneously (like merging 1x1 tiles into a 3x3 mega-lot), you must explicitly trigger a visual refresh for *all* affected footprint coordinates, not just the anchor.
+
+## [Success] BFS Service Grids (Area of Effect)
+- **Date:** 2026-05-04
+- **Pattern:** Reused the existing BFS (Breadth-First Search) grid logic for power/water to also map Civic Service (Police, Fire, Hospital) coverage radiuses.
+- **Lesson:** Building generalized infrastructure modules (`runBFS`) allows rapid feature expansion. Civic services now seamlessly propagate over road networks and connected zones using the same robust algorithm.
