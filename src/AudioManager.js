@@ -19,8 +19,16 @@ export class AudioManager {
 
   init() {
     if (this.isInitialized) return;
+    this.shufflePlaylist();
     this.loadTrack(this.currentIndex);
     this.isInitialized = true;
+  }
+
+  shufflePlaylist() {
+    for (let i = this.playlist.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [this.playlist[i], this.playlist[j]] = [this.playlist[j], this.playlist[i]];
+    }
   }
 
   toggleMute() {
