@@ -119,6 +119,53 @@ export class SceneManager {
 
   update(city, keys = {}) {
     this.handleKeyboard(keys);
+    
+    if (this.tourMode) {
+      // Move camera towards tourNextTarget
+      const speed = 0.08;
+      const dir = new THREE.Vector3().subVectors(this.tourNextTarget, this.camera.position);
+      const dist = dir.length();
+      
+      if (dist < 0.1) {
+        // We reached the target, pick next
+        const cx = Math.floor(this.tourNextTarget.x + 16);
+        const cy = Math.floor(this.tourNextTarget.z + 16);
+        
+        // Find adjacent roads
+        const adj = [];
+        const dirs = [[0,1],[1,0],[0,-1],[-1,0]];
+        for (let d of dirs) {
+          const nx = cx + d[0];
+          const ny = cy + d[1];
+          if (nx >= 0 && nx < city.size.width && ny >= 0 && ny < city.size.height) {
+            if (city.grid[nx][ny].type === 'road') {
+              const pos = new THREE.Vector3(nx - 16 + 0.5, 0.5, ny - 16 + 0.5);
+              // don't go backwards immediately if there's another option
+              if (pos.distanceTo(this.tourCurrentTarget) > 0.5) { 
+                adj.push({ pos, nx, ny });
+              }
+            }
+          }
+        }
+        
+        if (adj.length > 0) {
+          this.tourCurrentTarget = this.tourNextTarget.clone();
+          this.tourNextTarget = adj[Math.floor(Math.random() * adj.length)].pos;
+        } else {
+          // Dead end, just turn around
+          const temp = this.tourNextTarget.clone();
+          this.tourNextTarget = this.tourCurrentTarget.clone();
+          this.tourCurrentTarget = temp;
+        }
+      } else {
+        dir.normalize();
+        this.camera.position.addScaledVector(dir, speed);
+        // Look slightly ahead
+        const lookAtTarget = this.camera.position.clone().add(dir.multiplyScalar(2));
+        this.controls.target.lerp(lookAtTarget, 0.1);
+      }
+    }
+
     this.controls.update();
     
     // Only update objects that actually changed
@@ -342,5 +389,69 @@ export class SceneManager {
       new THREE.MeshPhongMaterial({ color, transparent: true, opacity: 0.5 })
     );
     return mesh;
+  }
+
+  toggleTourMode(city) {
+    this.tourMode = !this.tourMode;
+    
+    if (this.tourMode) {
+      // Find all road tiles
+      this.tourRoads = [];
+      for (let x = 0; x < city.size.width; x++) {
+        for (let y = 0; y < city.size.height; y++) {
+          if (city.grid[x][y].type === 'road') {
+            this.tourRoads.push({x, y});
+          }
+        }
+      }
+      
+      if (this.tourRoads.length === 0) {
+        this.tourMode = false;
+        console.warn("No roads to tour!");
+        return;
+      }
+      
+      // Save original camera position/target
+      this.originalCameraPos = this.camera.position.clone();
+      this.originalControlsTarget = this.controls.target.clone();
+      
+      // Pick a random starting road
+      const start = this.tourRoads[Math.floor(Math.random() * this.tourRoads.length)];
+      this.tourCurrentTarget = new THREE.Vector3(start.x - 16 + 0.5, 0.5, start.y - 16 + 0.5);
+      
+      // Find initial next target
+      const adj = [];
+      const dirs = [[0,1],[1,0],[0,-1],[-1,0]];
+      for (let d of dirs) {
+        const nx = start.x + d[0];
+        const ny = start.y + d[1];
+        if (nx >= 0 && nx < city.size.width && ny >= 0 && ny < city.size.height) {
+          if (city.grid[nx][ny].type === 'road') {
+            adj.push(new THREE.Vector3(nx - 16 + 0.5, 0.5, ny - 16 + 0.5));
+          }
+        }
+      }
+      
+      this.tourNextTarget = adj.length > 0 ? adj[Math.floor(Math.random() * adj.length)] : this.tourCurrentTarget;
+      
+      this.camera.position.copy(this.tourCurrentTarget);
+      this.controls.target.copy(this.tourNextTarget);
+      
+      this.controls.minDistance = 0.1;
+      this.controls.maxDistance = 100;
+      this.controls.maxPolarAngle = Math.PI; // allow looking around freely
+      
+      document.getElementById('tool-tour').classList.add('active');
+    } else {
+      // Restore camera
+      this.camera.position.copy(this.originalCameraPos);
+      this.controls.target.copy(this.originalControlsTarget);
+      
+      this.controls.minDistance = 10;
+      this.controls.maxDistance = 100;
+      this.controls.maxPolarAngle = Math.PI / 2.1;
+      
+      document.getElementById('tool-tour').classList.remove('active');
+    }
   }
 }

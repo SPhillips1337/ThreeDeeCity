@@ -21,7 +21,8 @@ class MaterialManager {
       'fire': '#991b1b',
       'school': '#ca8a04',
       'hospital': '#f8fafc',
-      'park': '#16a34a'
+      'park': '#16a34a',
+      'water': '#0ea5e9' // Water color
     };
 
     if (isLot) {

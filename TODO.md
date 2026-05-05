@@ -68,10 +68,10 @@
 - [ ] Traffic congestion overlay toggle (view mode)
 - [x] Power coverage overlay toggle
 - [x] Water coverage overlay toggle
-- [ ] Mini-map panel
+- [x] Mini-map panel
 - [x] Tooltip on tile hover (population, jobs, services)
-- [ ] Notification system (zone abandoned, power shortage, etc.)
-- [ ] City stats summary panel
+- [x] Notification system (zone abandoned, power shortage, etc.)
+- [x] City stats summary panel
 
 ## 📋 Phase 8 — Advanced Transport
 - [ ] Subway system (underground rail, station + tunnel tiles)

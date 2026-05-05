@@ -1,6 +1,7 @@
 import { Tile } from './Tile.js';
 import { RoadAccessModule, PowerModule, WaterModule, TrafficModule, ServiceModule, EnvironmentModule } from './SimModule.js';
 import { GameConfig } from '../GameConfig.js';
+import { createNoise2D } from 'simplex-noise';
 
 export class City {
   constructor(width, height) {
@@ -48,6 +49,8 @@ export class City {
   }
 
   init() {
+    const noise2D = createNoise2D();
+
     for (let x = 0; x < this.size.width; x++) {
       this.grid[x] = [];
       this.powerGrid[x] = [];
@@ -64,7 +67,20 @@ export class City {
       this.pollutionGrid[x] = [];
 
       for (let y = 0; y < this.size.height; y++) {
+        // Generate terrain using fractal noise
+        const nx = x / 16;
+        const ny = y / 16;
+        const e = 1 * noise2D(nx, ny) + 0.5 * noise2D(2 * nx, 2 * ny) + 0.25 * noise2D(4 * nx, 4 * ny);
+        const elevation = Math.max(0, Math.min(1, (e + 1.75) / 3.5)); // Normalize roughly to 0..1
+
         const tile = new Tile(x, y);
+        tile.elevation = elevation;
+        
+        // Sea level at 0.35
+        if (elevation < 0.35) {
+          tile.type = 'water';
+        }
+
         tile.addModule(new RoadAccessModule());
         tile.addModule(new PowerModule());
         tile.addModule(new WaterModule());

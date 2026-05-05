@@ -23,6 +23,8 @@ class Game {
     this.selectedDifficulty = 'medium';
     this.keys = {}; // Track pressed keys
     this.audioManager = new AudioManager();
+    
+    this.lastPopMilestone = 0;
 
     this.init();
   }
@@ -75,6 +77,11 @@ class Game {
           this.sceneManager.setDataView(view, this.city);
           document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
           btn.classList.add('active');
+          return;
+        }
+
+        if (btn.id === 'tool-tour') {
+          this.sceneManager.toggleTourMode(this.city);
           return;
         }
 
@@ -189,6 +196,7 @@ class Game {
     const effectiveInterval = this.tickInterval / this.timeScale;
     if (!this.isPaused && (time - this.lastTickTime > effectiveInterval)) {
       this.city.simulate();
+      this.checkCityEvents();
       this.lastTickTime = time;
       this.updateUI();
     }
@@ -207,6 +215,9 @@ class Game {
 
     window.addEventListener('keydown', (e) => {
       this.keys[e.code] = true;
+      if (e.key === 't' || e.key === 'T') {
+        this.sceneManager.toggleTourMode(this.city);
+      }
     });
 
     window.addEventListener('keyup', (e) => {
@@ -251,19 +262,66 @@ class Game {
 
     // RCI Demand
     this.updateRCIDemand();
+    
+    // Minimap
+    this.updateMinimap();
+  }
+
+  updateMinimap() {
+    const canvas = document.getElementById('minimap-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const w = this.city.size.width;
+    const h = this.city.size.height;
+    
+    const tileW = canvas.width / w;
+    const tileH = canvas.height / h;
+    
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    for (let x = 0; x < w; x++) {
+      for (let y = 0; y < h; y++) {
+        const tile = this.city.grid[x][y];
+        let color = '#3a5a3a'; // grass
+        if (tile.type === 'water') color = '#0ea5e9';
+        else if (tile.type === 'road') color = '#333333';
+        else if (tile.type === 'residential') color = '#4ade80';
+        else if (tile.type === 'commercial') color = '#60a5fa';
+        else if (tile.type === 'industrial') color = '#facc15';
+        else if (tile.type.startsWith('power')) color = '#eab308';
+        else if (tile.type.startsWith('water-pump')) color = '#3b82f6';
+        else if (tile.type === 'police') color = '#1e3a8a';
+        else if (tile.type === 'fire') color = '#991b1b';
+        else if (tile.type === 'school') color = '#ca8a04';
+        else if (tile.type === 'hospital') color = '#f8fafc';
+        else if (tile.type === 'park') color = '#16a34a';
+        
+        ctx.fillStyle = color;
+        ctx.fillRect(x * tileW, y * tileH, tileW, tileH);
+      }
+    }
   }
 
   updateRCIDemand() {
     const pop = this.city.stats.population;
     const jobs = this.city.stats.jobs;
     
-    // Improved demand formula:
-    // R demand high if low pop or high jobs
-    let rDemand = 100 - (pop / 20) + (jobs / 10);
-    // C demand high if pop > jobs
-    let cDemand = (pop / 4) - jobs + 20;
-    // I demand high if pop > jobs and low industrial density
-    let iDemand = (pop / 5) - jobs + 30;
+    // Improved demand formula using workforce ratio
+    const workforce = pop * 0.5; // ~50% of population works
+    
+    // R demand: high if there are more jobs than workforce.
+    let rDemand = 50 + ((jobs - workforce) / Math.max(10, jobs)) * 100;
+    
+    // C & I demand: high if workforce exceeds available jobs
+    let jobDeficit = workforce - jobs;
+    let cDemand = 20 + (jobDeficit / Math.max(10, workforce)) * 40;
+    let iDemand = 30 + (jobDeficit / Math.max(10, workforce)) * 60;
+    
+    // Scale down baseline demand as city gets huge to require careful balancing
+    const scale = Math.max(1, pop / 2000);
+    rDemand /= scale;
+    cDemand /= scale;
+    iDemand /= scale;
 
     rDemand = Math.max(-100, Math.min(100, rDemand));
     cDemand = Math.max(-100, Math.min(100, cDemand));
@@ -310,6 +368,12 @@ class Game {
     if (this.city.stats.money < cost) return;
 
     const tile = this.city.grid[x][y];
+    
+    // Prevent building on water, except bulldozing (which does nothing to water anyway, but safe to allow)
+    if (tile.type === 'water' && this.activeToolId !== 'tool-bulldoze' && this.activeToolId !== 'tool-water-pump') {
+      return;
+    }
+
     let changed = false;
 
     // Reset lot properties when applying new tools
@@ -349,7 +413,7 @@ class Game {
       if (tile.overlay) {
         tile.overlay = null;
       } else {
-        tile.type = 'grass';
+        tile.type = tile.elevation < 0.35 ? 'water' : 'grass';
         tile.density = 0;
         tile.residents = 0;
         tile.jobs = 0;
@@ -462,6 +526,41 @@ class Game {
   updateTimeUI(activeId) {
     document.querySelectorAll('.time-btn').forEach(btn => btn.classList.remove('active'));
     document.getElementById(activeId).classList.add('active');
+  }
+
+  notify(message, type = 'info') {
+    const panel = document.getElementById('notifications-panel');
+    const notif = document.createElement('div');
+    notif.className = `notification notif-${type}`;
+    notif.innerText = message;
+    panel.prepend(notif);
+
+    setTimeout(() => {
+      notif.classList.add('fade-out');
+      setTimeout(() => notif.remove(), 500);
+    }, 6000);
+  }
+
+  checkCityEvents() {
+    // Power shortages
+    if (this.city.stats.powerDemand > this.city.stats.powerSupply && Math.random() < 0.1) {
+      this.notify('Rolling blackouts! Build more power plants.', 'danger');
+    }
+    // High unemployment
+    if (this.city.stats.unemployment > 10 && Math.random() < 0.05) {
+      this.notify('High unemployment is causing crime to spike.', 'warning');
+    }
+    // Low approval
+    if (this.city.stats.approval < 30 && Math.random() < 0.05) {
+      this.notify('Approval rating is plummeting. Citizens demand better conditions!', 'danger');
+    }
+    
+    // Milestones
+    const pop = this.city.stats.population;
+    if (pop >= this.lastPopMilestone + 500) {
+      this.notify(`Milestone: Population reached ${pop.toLocaleString()}!`, 'success');
+      this.lastPopMilestone = Math.floor(pop / 500) * 500;
+    }
   }
 }
 

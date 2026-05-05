@@ -205,6 +205,11 @@
           <button class="tool-btn view-btn" data-view="park" title="Park Coverage">🌳</button>
         </div>
       </div>
+      <div class="separator"></div>
+      <!-- Tour Camera -->
+      <button class="tool-btn" id="tool-tour" title="Tour City (T)">
+        <svg viewBox="0 0 24 24"><path d="M4,4H7L9,2H15L17,4H20A2,2 0 0,1 22,6V18A2,2 0 0,1 20,20H4A2,2 0 0,1 2,18V6A2,2 0 0,1 4,4M12,7A5,5 0 0,0 7,12A5,5 0 0,0 12,17A5,5 0 0,0 17,12A5,5 0 0,0 12,7M12,9A3,3 0 0,1 15,12A3,3 0 0,1 12,15A3,3 0 0,1 9,12A3,3 0 0,1 12,9Z" /></svg>
+      </button>
     </nav>
   </div>
   
@@ -212,6 +217,12 @@
     <div id="tt-title" class="tt-bold">Residential (Medium)</div>
     <div id="tt-stats">Pop: 150 | Jobs: 0</div>
     <div id="tt-env">Happiness: 80% | Land Val: 65</div>
+  </div>
+
+  <div id="notifications-panel"></div>
+  
+  <div id="minimap-panel">
+    <canvas id="minimap-canvas" width="128" height="128"></canvas>
   </div>
 
   <canvas id="game-canvas"></canvas>

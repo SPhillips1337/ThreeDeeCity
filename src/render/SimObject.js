@@ -235,6 +235,7 @@ export class SimObject extends THREE.Group {
       case 'school': return new THREE.BoxGeometry(1.8, 0.8, 1.8);
       case 'hospital': return new THREE.BoxGeometry(1.8, 2.0, 1.8);
       case 'park': return new THREE.BoxGeometry(1.8, 0.1, 1.8);
+      case 'water': return new THREE.BoxGeometry(1, 0.05, 1);
       default: return new THREE.BoxGeometry(0.1, 0.1, 0.1);
     }
   }
