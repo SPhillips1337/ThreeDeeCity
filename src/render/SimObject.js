@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { materials } from './MaterialManager.js';
 
 /**
  * SimObject represents a single tile's visual representation in the 3D scene.
@@ -239,23 +240,7 @@ export class SimObject extends THREE.Group {
   }
 
   _getMaterial(type, isLot = false) {
-    if (this.tile.abandoned) return new THREE.MeshPhongMaterial({ color: 0x555555 });
-    const colors = { 
-      residential: 0x4ade80, 
-      commercial: 0x60a5fa, 
-      industrial: 0xfacc15, 
-      road: 0x333333,
-      'power-coal': 0x222222,
-      'power-wind': 0xdddddd,
-      'water-pump': 0x3b82f6,
-      'police': 0x1e3a8a, // dark blue
-      'fire': 0x991b1b, // dark red
-      'school': 0xca8a04, // dark yellow/orange
-      'hospital': 0xf8fafc, // white
-      'park': 0x16a34a // nice green
-    };
-    let color = colors[type] || 0x888888;
-    return new THREE.MeshPhongMaterial({ color, transparent: isLot, opacity: isLot ? 0.4 : 1.0 });
+    return materials.getMaterial(type, this.tile.abandoned, isLot);
   }
 
   update() {
@@ -283,7 +268,13 @@ export class SimObject extends THREE.Group {
   updateTrafficColor(congestion) {
     if (!this.children || this.children.length === 0) return;
     const mesh = this.children.find(c => c.isMesh && c.material);
-    if (!mesh) return;
+    if (!mesh || !mesh.material.color) return;
+
+    // Clone the material if it hasn't been cloned yet so we don't modify the global cache
+    if (!mesh.userData.hasClonedMaterial) {
+      mesh.material = mesh.material.clone();
+      mesh.userData.hasClonedMaterial = true;
+    }
 
     // Base road color: 0x333333 (rgb: 51, 51, 51)
     // Max congestion color: 0xff0000 (rgb: 255, 0, 0)

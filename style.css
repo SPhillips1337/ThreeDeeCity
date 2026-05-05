@@ -439,3 +439,27 @@ body {
 #toolbar {
   animation: slideIn 0.5s ease-out;
 }
+
+.tooltip {
+  position: absolute;
+  background: rgba(10, 10, 12, 0.9);
+  color: white;
+  padding: 8px 12px;
+  border-radius: 6px;
+  pointer-events: none;
+  font-size: 13px;
+  z-index: 1000;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  transition: opacity 0.1s;
+}
+.tooltip.hidden {
+  opacity: 0;
+}
+.tt-bold {
+  font-weight: 700;
+  margin-bottom: 4px;
+  color: #38bdf8;
+}

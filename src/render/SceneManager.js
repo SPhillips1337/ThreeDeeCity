@@ -222,51 +222,50 @@ export class SceneManager {
 
   applyDataViewTint(obj, tile) {
     if (!obj.children || obj.children.length === 0) return;
-    const mesh = obj.children.find(c => c.isMesh && c.material);
-    if (!mesh) return;
-
-    // Reset color to base material if view is 'none'
-    if (this.currentDataView === 'none') {
-      // Re-evaluate base color by just letting the object update itself next frame
-      // Or explicitly reset:
-      const baseMat = obj._getMaterial(tile.type, tile.lotSize && (tile.lotSize.w > 1 || tile.lotSize.h > 1));
-      mesh.material.color.copy(baseMat.color);
-      return;
-    }
-
-    let hasCoverage = false;
-    let tintColor = 0x000000;
-
-    if (this.currentDataView === 'power') {
-      const mod = tile.modules.find(m => m.name === 'Power');
-      hasCoverage = mod && mod.hasPower;
-      tintColor = 0xfacc15; // Yellow
-    } else if (this.currentDataView === 'water') {
-      const mod = tile.modules.find(m => m.name === 'Water');
-      hasCoverage = mod && mod.hasWater;
-      tintColor = 0x3b82f6; // Blue
-    } else {
-      // Civic Services
-      const services = tile.modules.find(m => m.name === 'Services');
-      if (services) {
-        hasCoverage = services.coverage[this.currentDataView];
-        const colors = {
-          police: 0x1e3a8a,
-          fire: 0x991b1b,
-          school: 0xca8a04,
-          hospital: 0xf8fafc,
-          park: 0x16a34a
-        };
-        tintColor = colors[this.currentDataView] || 0xffffff;
+    
+    // We only want to tint the main building meshes, not overlays/alerts
+    obj.children.forEach(mesh => {
+      if (!mesh.isMesh) return;
+      
+      // Reset color to base material if view is 'none'
+      if (this.currentDataView === 'none') {
+        mesh.material = obj._getMaterial(tile.type, tile.lotSize && (tile.lotSize.w > 1 || tile.lotSize.h > 1));
+        return;
       }
-    }
 
-    if (hasCoverage) {
-      mesh.material.color.setHex(tintColor);
-    } else {
-      // Dark grey out buildings without coverage
-      mesh.material.color.setHex(0x555555);
-    }
+      // If it's an overlay or alert (e.g. power-line), don't tint it in data views
+      if (mesh.geometry.type !== 'BoxGeometry' && mesh.geometry.type !== 'CylinderGeometry') return;
+
+      let hasCoverage = false;
+      let tintColor = 0x000000;
+
+      if (this.currentDataView === 'power') {
+        const mod = tile.modules.find(m => m.name === 'Power');
+        hasCoverage = mod && mod.hasPower;
+        tintColor = 0xfacc15; // Yellow
+      } else if (this.currentDataView === 'water') {
+        const mod = tile.modules.find(m => m.name === 'Water');
+        hasCoverage = mod && mod.hasWater;
+        tintColor = 0x3b82f6; // Blue
+      } else {
+        // Civic Services
+        const services = tile.modules.find(m => m.name === 'Services');
+        if (services) {
+          hasCoverage = services.coverage[this.currentDataView];
+          const colors = {
+            police: 0x1e3a8a,
+            fire: 0x991b1b,
+            school: 0xca8a04,
+            hospital: 0xf8fafc,
+            park: 0x16a34a
+          };
+          tintColor = colors[this.currentDataView] || 0xffffff;
+        }
+      }
+
+      const color = hasCoverage ? tintColor : 0x555555;
+      mesh.material = new THREE.MeshBasicMaterial({ color });
+    });
   }
 
   updateSelection(pos) {

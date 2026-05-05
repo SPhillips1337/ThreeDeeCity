@@ -122,6 +122,8 @@ class Game {
 
     canvas.addEventListener('mousemove', (e) => {
       const pos = this.sceneManager.getGridPosition(e);
+      const tooltip = document.getElementById('tile-tooltip');
+
       if (pos) {
         this.sceneManager.updateSelection(pos);
         if (this.isDragging) {
@@ -129,8 +131,32 @@ class Game {
         } else {
           this.sceneManager.updatePreviewSingle(pos, this.activeToolId);
         }
+
+        // Update Tooltip
+        const tile = this.city.grid[pos.x][pos.y];
+        if (tile && this.activeToolId === 'tool-select') {
+          tooltip.classList.remove('hidden');
+          tooltip.style.left = `${e.clientX + 15}px`;
+          tooltip.style.top = `${e.clientY + 15}px`;
+
+          let title = tile.type.charAt(0).toUpperCase() + tile.type.slice(1);
+          if (tile.abandoned) title = `Abandoned ${title}`;
+          document.getElementById('tt-title').innerText = `${title} (Lvl ${tile.developmentLevel})`;
+          
+          if (['residential', 'commercial', 'industrial'].includes(tile.type)) {
+            document.getElementById('tt-stats').innerText = `Pop/Jobs: ${tile.residents || tile.jobs} / ${Math.pow(tile.density || 1, 2) * 50}`;
+            document.getElementById('tt-env').innerText = `Happy: ${Math.floor(tile.happiness || 0)}% | LV: ${Math.floor(tile.modules.find(m => m.name === 'Environment')?.landValue || 0)}`;
+          } else {
+            document.getElementById('tt-stats').innerText = `Status: Active`;
+            document.getElementById('tt-env').innerText = ``;
+          }
+        } else {
+          tooltip.classList.add('hidden');
+        }
+
       } else {
         this.sceneManager.hideSelection();
+        tooltip.classList.add('hidden');
       }
     });
 
