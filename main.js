@@ -20,7 +20,9 @@ class Game {
 
     this.dragStart = null;
     this.mouseDownPos = { x: 0, y: 0 };
+    this.rightMouseDownPos = { x: 0, y: 0 };
     this.isMouseDown = false;
+    this.isRightMouseDown = false;
     this.isAreaDragging = false;
     this.selectedDifficulty = 'medium';
     this.keys = {}; // Track pressed keys
@@ -109,41 +111,57 @@ class Game {
     // Canvas Events
     const canvas = document.getElementById('game-canvas');
     canvas.addEventListener('mousedown', (e) => {
-      if (e.button !== 0 || this.isPaused) return;
-      this.mouseDownPos = { x: e.clientX, y: e.clientY };
-      this.isMouseDown = true;
+      if (this.isPaused) return;
       
-      const pos = this.sceneManager.getGridPosition(e);
-      if (pos) {
-        this.dragStart = pos;
-        // Shift key enables area zoning, otherwise it's a pan/click
-        if (e.shiftKey) {
-          this.isAreaDragging = true;
+      if (e.button === 0) {
+        this.mouseDownPos = { x: e.clientX, y: e.clientY };
+        this.isMouseDown = true;
+        const pos = this.sceneManager.getGridPosition(e);
+        if (pos) {
+          this.dragStart = pos;
+          // Enable area dragging if Shift is held OR if a tool is active (pan disabled)
+          if (e.shiftKey || this.activeToolId !== 'tool-select') {
+            this.isAreaDragging = true;
+          }
         }
+      } else if (e.button === 2) {
+        this.rightMouseDownPos = { x: e.clientX, y: e.clientY };
+        this.isRightMouseDown = true;
       }
     });
 
     canvas.addEventListener('mouseup', (e) => {
-      if (e.button !== 0 || !this.isMouseDown) return;
-      
-      const dx = e.clientX - this.mouseDownPos.x;
-      const dy = e.clientY - this.mouseDownPos.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-      
-      const pos = this.sceneManager.getGridPosition(e);
-      
-      if (pos) {
-        if (this.isAreaDragging) {
-          this.applyToolToArea(this.dragStart, pos);
-        } else if (distance < 5) {
-          // It was a click, not a pan
-          this.applyTool(pos.x, pos.y);
+      if (this.isPaused) return;
+
+      if (e.button === 0 && this.isMouseDown) {
+        const dx = e.clientX - this.mouseDownPos.x;
+        const dy = e.clientY - this.mouseDownPos.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        const pos = this.sceneManager.getGridPosition(e);
+        
+        if (pos) {
+          if (this.isAreaDragging) {
+            this.applyToolToArea(this.dragStart, pos);
+          } else if (distance < 5) {
+            this.applyTool(pos.x, pos.y);
+          }
         }
+        this.isMouseDown = false;
+        this.isAreaDragging = false;
+        this.dragStart = null;
+      } else if (e.button === 2 && this.isRightMouseDown) {
+        const dx = e.clientX - this.rightMouseDownPos.x;
+        const dy = e.clientY - this.rightMouseDownPos.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        if (distance < 5) {
+          // Stationary right click cancels tool
+          this.activeToolId = 'tool-select';
+          this.updateToolbarUI();
+        }
+        this.isRightMouseDown = false;
       }
       
-      this.isMouseDown = false;
-      this.isAreaDragging = false;
-      this.dragStart = null;
       this.sceneManager.clearPreview();
     });
 
@@ -195,16 +213,44 @@ class Game {
     // Setup right-click cancel
     this.setupEventListeners();
     
-    // Audio Toggle
+    // Audio Toggle & Radio Stations
     const audioBtn = document.getElementById('audio-toggle');
-    audioBtn.addEventListener('click', () => {
+    const radioMenu = document.getElementById('radio-menu');
+
+    audioBtn.addEventListener('click', (e) => {
+      // Regular click toggles mute
       const isMuted = this.audioManager.toggleMute();
       audioBtn.classList.toggle('active', !isMuted);
-      // Update icon based on mute state
       const iconPath = isMuted 
         ? "M16.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77zM3 9v6h4l5 5V4L7 9H3z"
         : "M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z";
       document.getElementById('audio-icon').querySelector('path').setAttribute('d', iconPath);
+    });
+
+    audioBtn.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      radioMenu.classList.toggle('hidden');
+    });
+
+    document.querySelectorAll('.menu-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const station = item.dataset.station;
+        this.audioManager.setStation(station);
+        
+        document.querySelectorAll('.menu-item').forEach(i => i.classList.remove('active'));
+        item.classList.add('active');
+        radioMenu.classList.add('hidden');
+        
+        // Ensure icon reflects active state
+        audioBtn.classList.add('active');
+      });
+    });
+
+    // Close menu when clicking elsewhere
+    window.addEventListener('click', (e) => {
+      if (!audioBtn.contains(e.target) && !radioMenu.contains(e.target)) {
+        radioMenu.classList.add('hidden');
+      }
     });
 
     // Start audio on first interaction if possible
@@ -231,9 +277,6 @@ class Game {
     // Prevent context menu on game canvas
     document.getElementById('game-canvas').addEventListener('contextmenu', (e) => {
       e.preventDefault();
-      // Right-click cancels tool
-      this.activeToolId = 'tool-select';
-      this.updateToolbarUI();
     });
 
     window.addEventListener('keydown', (e) => {
@@ -258,6 +301,9 @@ class Game {
       const hasActiveTool = cat.querySelector(`#${this.activeToolId}`);
       cat.classList.toggle('active', !!hasActiveTool);
     });
+
+    // Disable left-click pan if a tool is active
+    this.sceneManager.setPanEnabled(this.activeToolId === 'tool-select');
   }
 
   updateUI() {

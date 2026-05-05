@@ -55,6 +55,10 @@ export class SceneManager {
     };
   }
 
+  setPanEnabled(enabled) {
+    this.controls.mouseButtons.LEFT = enabled ? THREE.MOUSE.PAN : null;
+  }
+
   setupCamera() {
     this.camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
     this.camera.position.set(40, 40, 40);

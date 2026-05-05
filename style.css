@@ -518,3 +518,42 @@ body {
   height: 128px;
   border-radius: 8px;
 }
+
+.hidden {
+  display: none !important;
+}
+
+/* Context Menu */
+.context-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: rgba(15, 15, 20, 0.95);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 8px;
+  min-width: 140px;
+  z-index: 1000;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  margin-top: 10px;
+}
+
+.menu-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  color: #ccc;
+  font-size: 14px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.menu-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.menu-item.active {
+  color: #4ade80;
+  background: rgba(74, 222, 128, 0.1);
+}
