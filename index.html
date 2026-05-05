@@ -111,6 +111,22 @@
           <svg viewBox="0 0 24 24"><path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z" /></svg>
         </button>
       </div>
+
+      <div class="separator vertical"></div>
+
+      <!-- Settings Menu -->
+      <div id="settings-container" style="position: relative;">
+        <button class="tool-btn" id="menu-toggle" title="Menu">
+          <svg viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+        </button>
+        <div id="main-menu" class="context-menu hidden">
+          <div class="menu-item" id="menu-restart">Restart City</div>
+          <div class="menu-item" id="menu-options">Options</div>
+          <div class="menu-item" id="menu-help">Help</div>
+          <div class="menu-item" id="menu-credits">Credits</div>
+          <div class="menu-item" id="menu-about">About</div>
+        </div>
+      </div>
     </header>
 
     <nav id="toolbar">
@@ -158,6 +174,7 @@
           <button class="tool-btn" id="tool-power-coal" title="Coal Power Plant ($5,000)">🏭</button>
           <button class="tool-btn" id="tool-power-wind" title="Wind Turbine ($1,000)">🍃</button>
           <button class="tool-btn" id="tool-water-pump" title="Water Pump ($2,500)">💧</button>
+          <button class="tool-btn" id="tool-power-line" title="Power Line ($5)">⚡</button>
         </div>
       </div>
 
@@ -175,9 +192,6 @@
       <div class="separator"></div>
       <button class="tool-btn" id="tool-road" title="Build Road (W)">
         <svg viewBox="0 0 24 24"><path d="M11 16v-2h2v2h-2zm1-13C6.48 3 2 7.48 2 13s4.48 10 10 10 10-4.48 10-10S17.52 3 12 3zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13h-1v3h1V8zm0 4h-1v3h1v-3z" /></svg>
-      </button>
-      <button class="tool-btn" id="tool-power-line" title="Power Line ($5)">
-        <svg viewBox="0 0 24 24"><path d="M7 2v11h3v9l7-12h-4l4-8H7z" /></svg>
       </button>
       <div class="separator"></div>
       <button class="tool-btn" id="tool-bulldoze" title="Bulldoze (B)">
@@ -231,6 +245,20 @@
   </div>
 
   <canvas id="game-canvas"></canvas>
+  
+  <!-- Info Modal -->
+  <div id="info-modal" class="info-modal hidden">
+    <div class="info-modal-content glass">
+      <div class="info-modal-header">
+        <h2 id="modal-title">Info</h2>
+        <button id="modal-close">&times;</button>
+      </div>
+      <div id="modal-body" class="info-modal-body">
+        <!-- Content injected by JS -->
+      </div>
+    </div>
+  </div>
+
   <script type="module" src="./main.js"></script>
 </body>
 

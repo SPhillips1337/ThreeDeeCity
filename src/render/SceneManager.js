@@ -59,6 +59,19 @@ export class SceneManager {
     this.controls.mouseButtons.LEFT = enabled ? THREE.MOUSE.PAN : null;
   }
 
+  reset(city) {
+    // Remove all simulation objects
+    for (let x = 0; x < this.objects.length; x++) {
+      for (let y = 0; y < this.objects[x].length; y++) {
+        if (this.objects[x][y]) {
+          this.scene.remove(this.objects[x][y]);
+        }
+      }
+    }
+    this.objects = [];
+    this.initObjects(city);
+  }
+
   setupCamera() {
     this.camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
     this.camera.position.set(40, 40, 40);

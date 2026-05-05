@@ -14,11 +14,10 @@ confidence: high
 - **Pattern:** Initialized the project with the Anti-Gravity Prompt Protocol from the remote origin. Established semantic, episodic, and procedural memory segments before writing source code.
 - **Lesson:** Starting with a formal memory structure allows the agent to "know" the project's intent and history from Day 1, preventing context amnesia and reducing "Drag".
  
-+## [Success] Strategic Renaming to ThreeDeeCity
-+- **Date:** 2026-05-02
-+- **Pattern:** Renamed the project from `SimCity` to `ThreeDeeCity` after initial MVP development. Updated all UI strings, package names, and LTM records simultaneously.
-+- **Lesson:** Proactively addressing naming/branding issues early prevents legal friction (trademark) and clarifies the project's unique technical identity (3D web simulation).
-+
+## [Success] Strategic Renaming to ThreeDeeCity
+- **Date:** 2026-05-02
+- **Pattern:** Renamed the project from `SimCity` to `ThreeDeeCity` after initial MVP development. Updated all UI strings, package names, and LTM records simultaneously.
+- **Lesson:** Proactively addressing naming/branding issues early prevents legal friction (trademark) and clarifies the project's unique technical identity (3D web simulation).
 
 
 ## [Success] Protocol Initialization
@@ -26,15 +25,10 @@ confidence: high
 - **Pattern:** Created `AGENTS.md` and initialized `.antigravity/memories/` to solidify a high-velocity development protocol.
 - **Lesson:** Defining "Anti-Gravity" principles early reduces friction for future AI-driven tasks.
 
-## [Failure] Placeholder
-- **Date:** YYYY-MM-DD
-- **Pattern:** Describe what went wrong.
-- **Lesson:** Describe the takeaway.
-12: 
-13: ## [Success] Git Divergence Resolution
-14: - **Date:** 2026-03-31
-15: - **Pattern:** When facing divergent branches (local and remote), moved local work to a new target branch (`hermes-antigravity-sync`) and rebased local `main` on `origin/main`.
-16: - **Lesson:** This "Pivot and Rebase" approach avoids merge commits on `main` while safely publishing the latest changes to the remote for review.
+## [Success] Git Divergence Resolution
+- **Date:** 2026-03-31
+- **Pattern:** When facing divergent branches (local and remote), moved local work to a new target branch (`hermes-antigravity-sync`) and rebased local `main` on `origin/main`.
+- **Lesson:** This "Pivot and Rebase" approach avoids merge commits on `main` while safely publishing the latest changes to the remote for review.
 
 
 ## [Success] Protocol V2 Upgrade (pi-mono integration)
@@ -81,6 +75,26 @@ confidence: high
 - **Date:** 2026-05-04
 - **Pattern:** Implemented a performant linear interpolation (lerp) logic in `SceneManager.js` to dynamically shift road material colors from grey to red based on the `TrafficModule` congestion metric.
 - **Lesson:** Providing visual "heatmaps" directly on the game objects (roads) instead of a separate UI layer creates a much more immersive experience. Decoupling the color shift from mesh construction ensures zero performance impact on 60FPS rendering.
+
+## [Success] Navigation vs. Construction Mode (Pan Toggle)
+- **Date:** 2026-05-05
+- **Pattern:** Dynamically enabled/disabled OrbitControls `LEFT` mouse panning based on the `activeToolId`. When a tool is active, left-drag was re-bound to automatic area dragging (construction).
+- **Lesson:** Differentiating between "Navigation" and "Construction" intent based on tool state removes the need for complex modifier keys (like Shift) for common actions. This makes the UI feel "smarter" and more like a dedicated city-builder.
+
+## [Success] Contextual UI (Radio Stations)
+- **Date:** 2026-05-05
+- **Pattern:** Implemented a right-click context menu on existing HUD icons to reveal secondary settings (Radio Stations).
+- **Lesson:** Using secondary click actions on persistent HUD elements allows for deep configuration without cluttering the primary screen real estate. It preserves the "clean" glassmorphism aesthetic while adding significant functionality.
+
+## [Failure] Material Proxy Misidentification (Semi-Transparent Buildings)
+- **Date:** 2026-05-05
+- **Pattern:** Used `lotSize.w > 1` as a proxy for identifying "lots" (level 0 zones) when resetting Data Views. This caused all large buildings (2x2, 3x3) to become semi-transparent because the code thought they were unbuilt ground lots.
+- **Lesson:** Never use physical dimensions as a proxy for logical state. Always check the explicit state property (e.g., `tile.developmentLevel === 0`) to determine if a building should use its "construction/lot" material vs. its "solid/built" material.
+
+## [Success] UI Consolidation (Tool Drawer Migration)
+- **Date:** 2026-05-05
+- **Pattern:** Migrated redundant top-level tools (Power Lines) into logically related utility drawers (Infrastructure).
+- **Lesson:** As a toolbar grows, keeping only "High Level Action" icons (Road, Select, Bulldoze) on the root and moving specific implementations into drawers prevents visual fatigue and maintains a premium feel.
 
 ## [Success] Data View Overlays (Data-Driven Tinting)
 - **Date:** 2026-05-04

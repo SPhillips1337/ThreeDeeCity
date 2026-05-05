@@ -108,6 +108,42 @@ class Game {
       this.updateTimeUI('time-fast');
     });
 
+    // Menu toggle
+    const menuToggle = document.getElementById('menu-toggle');
+    const mainMenu = document.getElementById('main-menu');
+    
+    menuToggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      mainMenu.classList.toggle('hidden');
+    });
+
+    document.addEventListener('click', () => {
+      mainMenu.classList.add('hidden');
+    });
+
+    // Menu Actions
+    document.getElementById('menu-restart').addEventListener('click', () => {
+      if (confirm('Are you sure you want to restart? All progress will be lost.')) {
+        this.restartGame();
+      }
+    });
+
+    document.getElementById('menu-help').addEventListener('click', () => this.showModal('help'));
+    document.getElementById('menu-credits').addEventListener('click', () => this.showModal('credits'));
+    document.getElementById('menu-about').addEventListener('click', () => this.showModal('about'));
+    document.getElementById('menu-options').addEventListener('click', () => this.showModal('options'));
+
+    // Modal close
+    document.getElementById('modal-close').addEventListener('click', () => {
+      document.getElementById('info-modal').classList.add('hidden');
+    });
+    
+    window.addEventListener('click', (e) => {
+      if (e.target.id === 'info-modal') {
+        e.target.classList.add('hidden');
+      }
+    });
+
     // Canvas Events
     const canvas = document.getElementById('game-canvas');
     canvas.addEventListener('mousedown', (e) => {
@@ -232,12 +268,14 @@ class Game {
       radioMenu.classList.toggle('hidden');
     });
 
-    document.querySelectorAll('.menu-item').forEach(item => {
+    document.querySelectorAll('#radio-menu .menu-item').forEach(item => {
       item.addEventListener('click', () => {
         const station = item.dataset.station;
+        if (!station) return;
+        
         this.audioManager.setStation(station);
         
-        document.querySelectorAll('.menu-item').forEach(i => i.classList.remove('active'));
+        document.querySelectorAll('#radio-menu .menu-item').forEach(i => i.classList.remove('active'));
         item.classList.add('active');
         radioMenu.classList.add('hidden');
         
@@ -257,6 +295,98 @@ class Game {
     window.addEventListener('click', () => {
       this.audioManager.init();
     }, { once: true });
+  }
+
+  restartGame() {
+    const cityName = this.city.name;
+    const difficulty = this.selectedDifficulty;
+    this.city = new City(32, 32);
+    this.city.name = cityName;
+    this.city.setDifficulty(difficulty);
+    this.city.onTileChanged = (x, y, tile) => {
+      this.sceneManager.updateTileVisuals(x, y, tile);
+    };
+    this.sceneManager.reset(this.city);
+    this.updateUI();
+  }
+
+  showModal(page) {
+    const title = document.getElementById('modal-title');
+    const body = document.getElementById('modal-body');
+    const modal = document.getElementById('info-modal');
+
+    const content = {
+      help: `
+        <h3>Getting Started</h3>
+        <p>Build your city by zoning areas for Residential, Commercial, and Industrial growth. Connect them with roads and provide essential utilities.</p>
+        <h3>Controls</h3>
+        <p><strong>Left Click &amp; Drag:</strong> Pan camera (Select tool) / Build (Active tool)</p>
+        <p><strong>Right Click &amp; Drag:</strong> Rotate camera</p>
+        <p><strong>Scroll:</strong> Zoom in/out</p>
+        <p><strong>Right Click (Stationary):</strong> Cancel current tool</p>
+        <p><strong>WASD:</strong> Move camera</p>
+        <p><strong>Q/E:</strong> Rotate camera</p>
+        <p><strong>T:</strong> Toggle street-level tour mode</p>
+        <h3>Utilities</h3>
+        <p>Buildings need ⚡ Power and 💧 Water. Place power plants and water pumps, then connect them to your zones via roads or power lines.</p>
+        <h3>Growth</h3>
+        <p>Zone areas for Residential (R), Commercial (C), and Industrial (I) development. Connect zones with roads and provide services to encourage growth and density upgrades.</p>
+      `,
+      credits: `
+        <h3>Development</h3>
+        <p>Built with <a href="https://github.com/SPhillips1337/ThreeDeeCity" target="_blank">ThreeDeeCity</a> — powered by Antigravity AI.</p>
+        <h3>Inspiration &amp; Assets</h3>
+        <ul style="list-style: none; padding: 0; margin-bottom: 16px;">
+          <li>🔗 <a href="https://github.com/wiktordereszewski/ThreeJSCity" target="_blank">ThreeJSCity</a> — Wiktor Dereszewski</li>
+          <li>🔗 <a href="https://github.com/dgreenheck/simcity-threejs-clone" target="_blank">SimCity Three.js Clone</a> — dgreenheck</li>
+          <li>🔗 <a href="https://github.com/mauriciopoppe/Three.js-City" target="_blank">Three.js-City</a> — Mauricio Poppe</li>
+          <li>🔗 <a href="https://github.com/davemn/city-generator" target="_blank">City Generator</a> — davemn</li>
+          <li>🔗 <a href="https://github.com/jeromeetienne/threex.proceduralcity" target="_blank">ThreeX Procedural City</a> — Jerome Etienne</li>
+          <li>🔗 <a href="https://github.com/jstrait/city-tour" target="_blank">City Tour</a> — jstrait</li>
+          <li>🔗 <a href="https://github.com/MHillier98/IntroToComputerGraphics-CityGenerator" target="_blank">City Generator</a> — MHillier98</li>
+          <li>🔗 <a href="https://github.com/photonlines/Procedural-City-Generator" target="_blank">Procedural City Generator</a> — photonlines</li>
+        </ul>
+        <h3>Music</h3>
+        <p>All music sourced from <a href="https://pixabay.com/music/" target="_blank">Pixabay</a> under their content license.</p>
+        <ul style="list-style: none; padding: 0;">
+          <li>🎵 <a href="https://pixabay.com/music/upbeat-smooth-city-living-108388/" target="_blank">Smooth City Living</a></li>
+          <li>🎵 <a href="https://pixabay.com/music/pop-kanashimi-no-koi-tavc-city-pop-361227/" target="_blank">Kanashimi no Koi</a> — TAVC</li>
+          <li>🎵 <a href="https://pixabay.com/music/pop-%e3%82%b5%e3%83%9e%e3%83%bc%e3%83%9b%e3%83%aa%e3%83%87%e3%83%bc-tavc-city-pop-361214/" target="_blank">サマーホリデー (Summer Holiday)</a> — TAVC</li>
+          <li>🎵 <a href="https://pixabay.com/music/pop-%e5%a4%b1%e6%81%8b%e3%81%ae%e6%ad%8c-tavc-city-pop-368749/" target="_blank">失恋の歌 (Shitsuren no Uta)</a> — TAVC</li>
+          <li>🎵 <a href="https://pixabay.com/music/pop-%e6%9c%88%e5%a4%9c%e3%81%ae%e3%83%80%e3%83%b3%e3%82%b9-tavc-city-pop-361207/" target="_blank">月夜のダンス (Tsukiyo no Dance)</a> — TAVC</li>
+          <li>🎵 <a href="https://pixabay.com/music/electro-echoes-in-the-glass-city-v2-450734/" target="_blank">Echoes in the Glass City</a></li>
+          <li>🎵 <a href="https://pixabay.com/music/pop-%e6%84%9b%e3%81%ae%e6%ac%a0%e7%89%87-tavc-city-pop-368750/" target="_blank">愛の欠片 (Ai no Kakera)</a> — TAVC</li>
+          <li>🎵 <a href="https://pixabay.com/music/beats-big-city-big-dreams-217874/" target="_blank">Big City Big Dreams</a></li>
+          <li>🎵 <a href="https://pixabay.com/music/beats-city-streets-342387/" target="_blank">City Streets</a></li>
+          <li>🎵 <a href="https://pixabay.com/music/beats-city-vibes-247646/" target="_blank">City Vibes</a></li>
+          <li>🎵 <a href="https://pixabay.com/music/beautiful-plays-in-the-city-110589/" target="_blank">Beautiful Plays in the City</a></li>
+          <li>🎵 <a href="https://pixabay.com/music/traditional-jazz-18021603-jazzy-pop-piano-japan-city-155528/" target="_blank">Jazzy Pop Piano Japan City</a></li>
+          <li>🎵 <a href="https://pixabay.com/music/electronic-night-city-418052/" target="_blank">Night City</a></li>
+          <li>🎵 <a href="https://pixabay.com/music/upbeat-lion-city-growth-391737/" target="_blank">Lion City Growth</a></li>
+          <li>🎵 <a href="https://pixabay.com/music/upbeat-city-pulse-2-338784/" target="_blank">City Pulse 2</a></li>
+          <li>🎵 <a href="https://pixabay.com/music/funk-gemma-party-430732/" target="_blank">Gemma Party</a></li>
+          <li>🎵 <a href="https://pixabay.com/fr/users/lnplusmusic-47631836/" target="_blank">lnplusmusic</a> — Pixabay Artist</li>
+        </ul>
+      `,
+      about: `
+        <h3>ThreeDeeCity</h3>
+        <p>A procedural 3D city builder running entirely in your browser.</p>
+        <p>Built with <strong>Three.js</strong>, <strong>Vite</strong>, and vanilla JavaScript.</p>
+        <p style="margin-top: 20px; padding: 12px; background: rgba(255,255,255,0.05); border-radius: 8px;">
+          <strong>Version 0.7.2</strong> — "The Radio Update"<br>
+          <span style="color: #888;">Real-time traffic · Economic simulation · Dynamic audio · Data views</span>
+        </p>
+        <p><a href="https://github.com/SPhillips1337/ThreeDeeCity" target="_blank">View on GitHub →</a></p>
+      `,
+      options: `
+        <h3>Game Options</h3>
+        <p style="color: #888;">Settings are coming in a future update. Currently the game auto-optimizes based on your hardware.</p>
+      `
+    };
+
+    title.innerText = page.charAt(0).toUpperCase() + page.slice(1);
+    body.innerHTML = content[page] || '<p>Content not found.</p>';
+    modal.classList.remove('hidden');
   }
 
   animate(time) {
