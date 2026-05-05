@@ -282,7 +282,8 @@ export class SceneManager {
       
       // Reset color to base material if view is 'none'
       if (this.currentDataView === 'none') {
-        mesh.material = obj._getMaterial(tile.type, tile.lotSize && (tile.lotSize.w > 1 || tile.lotSize.h > 1));
+        const isLot = (tile.developmentLevel === 0) && ['residential', 'commercial', 'industrial'].includes(tile.type);
+        mesh.material = obj._getMaterial(tile.type, isLot);
         return;
       }
 

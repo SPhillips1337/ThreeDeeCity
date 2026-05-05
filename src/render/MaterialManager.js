@@ -14,15 +14,15 @@ class MaterialManager {
       commercial: '#60a5fa', 
       industrial: '#facc15', 
       road: '#333333',
-      'power-coal': '#222222',
-      'power-wind': '#dddddd',
-      'water-pump': '#3b82f6',
+      'power-coal': '#374151',
+      'power-wind': '#f3f4f6',
+      'water-pump': '#2563eb',
       'police': '#1e3a8a',
       'fire': '#991b1b',
       'school': '#ca8a04',
       'hospital': '#f8fafc',
       'park': '#16a34a',
-      'water': '#0ea5e9' // Water color
+      'water': '#0ea5e9'
     };
 
     if (isLot) {
@@ -32,7 +32,7 @@ class MaterialManager {
       return mat;
     }
 
-    const isBuilding = ['residential', 'commercial', 'industrial', 'police', 'fire', 'school', 'hospital', 'power-coal'].includes(type);
+    const isBuilding = ['residential', 'commercial', 'industrial', 'police', 'fire', 'school', 'hospital', 'power-coal', 'power-wind', 'water-pump'].includes(type);
     const isPark = type === 'park';
 
     if (isBuilding) {
