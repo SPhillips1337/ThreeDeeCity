@@ -66,8 +66,12 @@ class Game {
     // Tool selection
     document.querySelectorAll('.tool-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
+        // Exclude UI buttons that aren't tools
+        if (btn.id === 'menu-toggle' || btn.id === 'audio-toggle') {
+          return;
+        }
+
         // If it's a category button, just toggle drawer (handled by CSS hover/active mostly)
-        // but we want it to stay open if a tool inside is active.
         if (btn.classList.contains('category-btn')) {
           const category = btn.closest('.tool-category');
           const wasActive = category.classList.contains('active');
