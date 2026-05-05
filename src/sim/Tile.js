@@ -85,29 +85,31 @@ export class Tile {
     }
 
     // Calculate Happiness
-    let happiness = 50; // Base
+    let happiness = 60; // Base (higher starting point)
     if (env) {
       happiness += (env.landValue - 50) * 0.4;
-      if (env.pollution > 20) happiness -= 15;
+      if (env.pollution > 30) happiness -= 10; // Softer penalty, higher threshold
     }
-    if (traffic && traffic.congestion > 50) happiness -= 10;
-    if (this.commuteTime > 20) happiness -= (this.commuteTime - 20) * 0.5;
+    if (traffic && traffic.congestion > 60) happiness -= 8; // Softer penalty
+    if (this.commuteTime > 25) happiness -= (this.commuteTime - 25) * 0.4; // Softer penalty
     
     // Crime penalty (based on unemployment and lack of police)
     const unemployment = city.stats.unemployment || 0;
-    let localCrime = Math.max(0, unemployment - 5);
+    let localCrime = Math.max(0, unemployment - 10); // Higher threshold for crime
     if (services && services.coverage.police) {
       localCrime = 0; // Police suppresses crime
     }
-    happiness -= localCrime * 2;
+    // Power/Water boosts
+    if (power.hasPower) happiness += 10; else happiness -= 20;
+    if (water.hasWater) happiness += 5; else happiness -= 10;
     
-    happiness += (0.09 - city.taxRates.residential) * 200;
+    happiness += (0.10 - city.taxRates.residential) * 150; 
     this.happiness = Math.max(0, Math.min(100, happiness));
 
     // Low happiness leads to abandonment
-    if (this.happiness < 20 || (traffic && traffic.congestion > 80)) {
+    if (this.happiness < 15 || (traffic && traffic.congestion > 90)) {
       this.abandoned = true;
-      this.residents *= 0.95;
+      this.residents *= 0.90;
       if (this.residents < 1) this.developmentLevel = 0;
       return;
     }
@@ -144,7 +146,12 @@ export class Tile {
     }
     
     // Scale growth by happiness
-    serviceMultiplier *= (this.happiness / 50);
+    serviceMultiplier *= (this.happiness / 60);
+
+    // Only anchors simulate population/job growth for large lots
+    if (this.lotSize.w > 1 || this.lotSize.h > 1) {
+      if (!this.isAnchor) return;
+    }
 
     const capacity = Math.pow(this.density, 2) * 50;
     

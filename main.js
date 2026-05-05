@@ -19,7 +19,9 @@ class Game {
     this.timeScale = 1;
 
     this.dragStart = null;
-    this.isDragging = false;
+    this.mouseDownPos = { x: 0, y: 0 };
+    this.isMouseDown = false;
+    this.isAreaDragging = false;
     this.selectedDifficulty = 'medium';
     this.keys = {}; // Track pressed keys
     this.audioManager = new AudioManager();
@@ -108,21 +110,39 @@ class Game {
     const canvas = document.getElementById('game-canvas');
     canvas.addEventListener('mousedown', (e) => {
       if (e.button !== 0 || this.isPaused) return;
+      this.mouseDownPos = { x: e.clientX, y: e.clientY };
+      this.isMouseDown = true;
+      
       const pos = this.sceneManager.getGridPosition(e);
       if (pos) {
-        this.isDragging = true;
         this.dragStart = pos;
-        this.applyTool(pos.x, pos.y);
+        // Shift key enables area zoning, otherwise it's a pan/click
+        if (e.shiftKey) {
+          this.isAreaDragging = true;
+        }
       }
     });
 
     canvas.addEventListener('mouseup', (e) => {
-      if (e.button !== 0 || !this.isDragging) return;
+      if (e.button !== 0 || !this.isMouseDown) return;
+      
+      const dx = e.clientX - this.mouseDownPos.x;
+      const dy = e.clientY - this.mouseDownPos.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      
       const pos = this.sceneManager.getGridPosition(e);
+      
       if (pos) {
-        this.applyToolToArea(this.dragStart, pos);
+        if (this.isAreaDragging) {
+          this.applyToolToArea(this.dragStart, pos);
+        } else if (distance < 5) {
+          // It was a click, not a pan
+          this.applyTool(pos.x, pos.y);
+        }
       }
-      this.isDragging = false;
+      
+      this.isMouseDown = false;
+      this.isAreaDragging = false;
       this.dragStart = null;
       this.sceneManager.clearPreview();
     });
@@ -133,10 +153,13 @@ class Game {
 
       if (pos) {
         this.sceneManager.updateSelection(pos);
-        if (this.isDragging) {
+        if (this.isAreaDragging) {
           this.sceneManager.updatePreviewArea(this.dragStart, pos, this.activeToolId);
-        } else {
+        } else if (!this.isMouseDown) {
           this.sceneManager.updatePreviewSingle(pos, this.activeToolId);
+        } else {
+          // Dragging without shift (panning), hide preview
+          this.sceneManager.clearPreview();
         }
 
         // Update Tooltip

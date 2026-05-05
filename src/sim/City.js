@@ -341,11 +341,13 @@ export class City {
       for (let y = 0; y < this.size.height; y++) {
         const tile = this.grid[x][y];
         // Multi-tile building population is stored in the anchor
-        if (tile.isAnchor) {
+        // Fallback: If residents > 0, count it anyway to prevent stat drops
+        if (tile.isAnchor || tile.residents > 0 || tile.jobs > 0) {
           totalPop += tile.residents || 0;
           totalJobs += tile.jobs || 0;
-          if (tile.type === 'residential' && tile.residents > 0) {
-            totalHappiness += tile.happiness || 50;
+          
+          if (tile.type === 'residential' && (tile.residents > 0 || tile.isAnchor)) {
+            totalHappiness += tile.happiness || 60;
             resTiles++;
           }
         }
@@ -367,14 +369,26 @@ export class City {
       this.stats.unemployment = 0;
     }
 
-    this.stats.happiness = resTiles > 0 ? Math.floor(totalHappiness / resTiles) : 50;
+    // Update RCI Demand (Workforce Ratio Model)
+    // Residential demand: based on (jobs / workforce)
+    this.stats.demand.residential = workforce > 0 ? (this.stats.jobs / workforce) * 20 - 10 : 20;
+    // Commercial/Industrial demand: based on (workforce / jobs)
+    this.stats.demand.commercial = this.stats.jobs > 0 ? (workforce / this.stats.jobs) * 15 - 5 : 10;
+    this.stats.demand.industrial = this.stats.jobs > 0 ? (workforce / this.stats.jobs) * 25 - 10 : 15;
+
+    // Clamp demand
+    this.stats.demand.residential = Math.max(-50, Math.min(50, this.stats.demand.residential));
+    this.stats.demand.commercial = Math.max(-50, Math.min(50, this.stats.demand.commercial));
+    this.stats.demand.industrial = Math.max(-50, Math.min(50, this.stats.demand.industrial));
+
+    this.stats.happiness = resTiles > 0 ? Math.floor(totalHappiness / resTiles) : 60;
     this.stats.landValue = landTiles > 0 ? Math.floor(totalLandValue / landTiles) : 50;
     
     // Calculate Approval Rating
     let approval = this.stats.happiness;
     const avgTax = (this.taxRates.residential + this.taxRates.commercial + this.taxRates.industrial) / 3;
-    if (avgTax > 0.09) approval -= (avgTax - 0.09) * 200; // High tax penalty
-    if (this.stats.unemployment > 5) approval -= (this.stats.unemployment - 5) * 2; // Unemployment penalty
+    if (avgTax > 0.10) approval -= (avgTax - 0.10) * 150; // High tax penalty
+    if (this.stats.unemployment > 10) approval -= (this.stats.unemployment - 10) * 1.5; // Unemployment penalty
     this.stats.approval = Math.max(0, Math.min(100, Math.floor(approval)));
   }
 
@@ -555,8 +569,8 @@ export class City {
     for (let x = 0; x < this.size.width; x++) {
       for (let y = 0; y < this.size.height; y++) {
         const tile = this.grid[x][y];
-        if (tile.type === 'power-coal') this.pollutionGrid[x][y] += 100;
-        else if (tile.type === 'industrial') this.pollutionGrid[x][y] += tile.jobs * 2;
+        if (tile.type === 'power-coal') this.pollutionGrid[x][y] += 60;
+        else if (tile.type === 'industrial') this.pollutionGrid[x][y] += tile.jobs * 0.5;
         else if (tile.type === 'highway') this.pollutionGrid[x][y] += (this.trafficGrid[x][y] || 0) * 0.5;
         else if (tile.type === 'road') this.pollutionGrid[x][y] += (this.trafficGrid[x][y] || 0) * 0.2;
       }

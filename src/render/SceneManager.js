@@ -48,10 +48,9 @@ export class SceneManager {
     this.controls.maxDistance = 100;
     this.controls.maxPolarAngle = Math.PI / 2.1;
     
-    // Disable left click rotation to allow tool usage
     this.controls.mouseButtons = {
-      LEFT: null,
-      MIDDLE: THREE.MOUSE.PAN,
+      LEFT: THREE.MOUSE.PAN,
+      MIDDLE: THREE.MOUSE.DOLLY,
       RIGHT: THREE.MOUSE.ROTATE
     };
   }

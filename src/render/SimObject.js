@@ -70,7 +70,10 @@ export class SimObject extends THREE.Group {
     const density = this.tile.density || 1;
     const type = this.tile.type;
 
-    if (level === 0 && ['residential', 'commercial', 'industrial'].includes(type)) {
+    const isZoned = ['residential', 'commercial', 'industrial'].includes(type);
+    const isCivic = ['police', 'fire', 'school', 'hospital', 'power-coal', 'power-wind', 'water-pump', 'park'].includes(type);
+
+    if (level === 0 && isZoned) {
       // Zoned lot: flat translucent area matching lot size
       const geometry = new THREE.BoxGeometry(w - 0.1, 0.05, h - 0.1);
       const material = this._getMaterial(type, true);
@@ -80,7 +83,7 @@ export class SimObject extends THREE.Group {
       return;
     }
 
-    if (['residential', 'commercial', 'industrial'].includes(type)) {
+    if (isZoned || isCivic) {
       this._addComplexBuilding(type, level, density, w, h);
     } else {
       const geometry = this._getBasicGeometry(type);
@@ -99,7 +102,11 @@ export class SimObject extends THREE.Group {
     const style = this.tile.styleId || 0;
     const material = this._getMaterial(type);
 
-    if (type === 'industrial') {
+    if (type === 'park') {
+      this._addPark(w, h);
+    } else if (['police', 'fire', 'school', 'hospital', 'power-coal', 'power-wind', 'water-pump'].includes(type)) {
+      this._addCivicBuilding(type, w, h);
+    } else if (type === 'industrial') {
       this._createIndustrialSprawl(footprintW, footprintH, level, density, style, material);
     } else if (density === 3 && w >= 2) {
       this._createSkyscraper(type, footprintW, footprintH, level, density, style, material);
@@ -107,6 +114,106 @@ export class SimObject extends THREE.Group {
       this._createCottage(footprintW, level, style, material);
     } else {
       this._createStandardBuilding(type, footprintW, footprintH, level, style, material);
+    }
+  }
+
+  _addCivicBuilding(type, w, h) {
+    const material = this._getMaterial(type);
+    const geometry = this._getBasicGeometry(type);
+    const height = geometry.parameters.height;
+    
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.y = height / 2 + 0.01;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    this.add(mesh);
+
+    // Roof details for civic
+    const roofGeom = new THREE.BoxGeometry(w * 0.8, 0.05, h * 0.8);
+    const roofMat = new THREE.MeshPhongMaterial({ color: 0x333333 });
+    const roof = new THREE.Mesh(roofGeom, roofMat);
+    roof.position.y = height + 0.03;
+    this.add(roof);
+
+    if (type === 'hospital') {
+      // Red Cross on roof
+      const crossH = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.06, 0.2), new THREE.MeshBasicMaterial({ color: 0xff0000 }));
+      const crossV = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.06, 0.8), new THREE.MeshBasicMaterial({ color: 0xff0000 }));
+      crossH.position.y = height + 0.06;
+      crossV.position.y = height + 0.06;
+      this.add(crossH, crossV);
+    }
+
+    if (type === 'power-coal') {
+      // Chimneys
+      const chimneyGeom = new THREE.CylinderGeometry(0.2, 0.3, 1.2, 8);
+      const chimneyMat = new THREE.MeshPhongMaterial({ color: 0x555555 });
+      for (let i = 0; i < 2; i++) {
+        const chimney = new THREE.Mesh(chimneyGeom, chimneyMat);
+        chimney.position.set(-0.5 + i * 1.0, 1.5, 0.5);
+        this.add(chimney);
+      }
+    }
+
+    if (type === 'power-wind') {
+      // Wind Turbine Blades
+      const bladeGeom = new THREE.BoxGeometry(0.1, 1.5, 0.2);
+      const bladeMat = new THREE.MeshPhongMaterial({ color: 0xffffff });
+      for (let i = 0; i < 3; i++) {
+        const blade = new THREE.Mesh(bladeGeom, bladeMat);
+        blade.position.y = height;
+        blade.rotation.z = (i * Math.PI * 2) / 3;
+        blade.position.z = 0.2;
+        this.add(blade);
+      }
+    }
+
+    if (type === 'water-pump') {
+      // Pipes
+      const pipeGeom = new THREE.CylinderGeometry(0.15, 0.15, 0.8, 8);
+      const pipeMat = new THREE.MeshPhongMaterial({ color: 0x888888 });
+      const pipe = new THREE.Mesh(pipeGeom, pipeMat);
+      pipe.rotation.x = Math.PI / 2;
+      pipe.position.set(0, 0.5, 0.6);
+      this.add(pipe);
+    }
+  }
+
+  _addPark(w, h) {
+    const material = this._getMaterial('park');
+    const geometry = new THREE.BoxGeometry(w - 0.1, 0.1, h - 0.1);
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.y = 0.05;
+    mesh.receiveShadow = true;
+    this.add(mesh);
+
+    // Add 3D Trees
+    const treeCount = Math.floor(w * h * 2);
+    const coneGeom = new THREE.ConeGeometry(0.15, 0.4, 8);
+    const trunkGeom = new THREE.CylinderGeometry(0.04, 0.04, 0.2);
+    const leafMat = new THREE.MeshPhongMaterial({ color: 0x166534 });
+    const trunkMat = new THREE.MeshPhongMaterial({ color: 0x451a03 });
+
+    for (let i = 0; i < treeCount; i++) {
+      const tree = new THREE.Group();
+      const trunk = new THREE.Mesh(trunkGeom, trunkMat);
+      const leaves = new THREE.Mesh(coneGeom, leafMat);
+      
+      trunk.position.y = 0.1;
+      leaves.position.y = 0.3;
+      tree.add(trunk, leaves);
+      
+      // Random position within park, avoid the football pitch area (center)
+      tree.position.set(
+        (Math.random() - 0.5) * (w - 0.5),
+        0.05,
+        (Math.random() - 0.5) * (h - 0.5)
+      );
+      
+      // Don't place trees in the middle if it's a large park (football pitch area)
+      if (w > 1 && Math.abs(tree.position.x) < 0.4 && Math.abs(tree.position.z) < 0.4) continue;
+      
+      this.add(tree);
     }
   }
 
@@ -141,6 +248,22 @@ export class SimObject extends THREE.Group {
       mesh.position.y = (tierHeight / 2) + (i * tierHeight);
       mesh.castShadow = true;
       this.add(mesh);
+
+      // Antenna/Helipad on top tier
+      if (i === tiers - 1) {
+        if (type === 'commercial') {
+          const antennaGeom = new THREE.BoxGeometry(0.05, 1.0, 0.05);
+          const antenna = new THREE.Mesh(antennaGeom, new THREE.MeshPhongMaterial({ color: 0x333333 }));
+          antenna.position.y = totalHeight + 0.5;
+          this.add(antenna);
+        } else {
+          const helipadGeom = new THREE.CircleGeometry(0.3, 16);
+          const helipad = new THREE.Mesh(helipadGeom, new THREE.MeshBasicMaterial({ color: 0x333333 }));
+          helipad.rotation.x = -Math.PI / 2;
+          helipad.position.y = totalHeight + 0.01;
+          this.add(helipad);
+        }
+      }
     }
   }
 

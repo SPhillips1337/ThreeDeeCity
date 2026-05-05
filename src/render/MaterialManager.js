@@ -32,13 +32,19 @@ class MaterialManager {
       return mat;
     }
 
-    const isBuilding = ['residential', 'commercial', 'industrial'].includes(type);
-    
+    const isBuilding = ['residential', 'commercial', 'industrial', 'police', 'fire', 'school', 'hospital', 'power-coal'].includes(type);
+    const isPark = type === 'park';
+
     if (isBuilding) {
       const color = isAbandoned ? '#555555' : colors[type];
-      const windowColor = isAbandoned ? '#111111' : (type === 'commercial' ? '#e0f2fe' : '#fef08a');
+      let windowColor = isAbandoned ? '#111111' : (type === 'commercial' ? '#e0f2fe' : '#fef08a');
       
-      const sideTex = this.createWindowTexture(color, windowColor, isAbandoned);
+      // Customize window color for civic buildings
+      if (type === 'police') windowColor = '#bfdbfe'; // Light blue
+      if (type === 'fire') windowColor = '#fecaca';   // Light red
+      if (type === 'hospital') windowColor = '#ccfbf1'; // Light teal
+      
+      const sideTex = this.createWindowTexture(color, windowColor, isAbandoned, type);
       const topTex = this.createRoofTexture(color);
 
       const sideMat = new THREE.MeshPhongMaterial({ map: sideTex });
@@ -56,13 +62,22 @@ class MaterialManager {
       return materials;
     }
 
+    if (isPark) {
+      const topTex = this.createParkTexture();
+      const sideMat = new THREE.MeshPhongMaterial({ color: 0x16a34a });
+      const topMat = new THREE.MeshPhongMaterial({ map: topTex });
+      const materials = [sideMat, sideMat, topMat, sideMat, sideMat, sideMat];
+      this.cache[key] = materials;
+      return materials;
+    }
+
     const colorHex = parseInt((colors[type] || '#888888').replace('#', '0x'));
     const mat = new THREE.MeshPhongMaterial({ color: isAbandoned ? 0x555555 : colorHex });
     this.cache[key] = mat;
     return mat;
   }
 
-  createWindowTexture(baseColor, windowColor, isAbandoned) {
+  createWindowTexture(baseColor, windowColor, isAbandoned, type) {
     const canvas = document.createElement('canvas');
     canvas.width = 256;
     canvas.height = 256;
@@ -77,8 +92,19 @@ class MaterialManager {
       ctx.fillRect(Math.random()*256, Math.random()*256, 2, 2);
     }
 
+    // Special case for Fire Station (garage doors at bottom)
+    if (type === 'fire') {
+      ctx.fillStyle = '#333';
+      for (let i = 0; i < 3; i++) {
+        ctx.fillRect(20 + i * 80, 180, 56, 76);
+        ctx.strokeStyle = '#666';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(20 + i * 80, 180, 56, 76);
+      }
+    }
+
     // Windows
-    const cols = 6;
+    const cols = (type === 'industrial' || type === 'power-coal') ? 4 : 6;
     const rows = 8;
     const wWidth = 16;
     const wHeight = 20;
@@ -86,11 +112,11 @@ class MaterialManager {
     const spacingY = 256 / rows;
 
     for (let c = 0; c < cols; c++) {
-      for (let r = 0; r < rows; r++) {
+      for (let r = 0; r < (type === 'fire' ? 5 : rows); r++) {
         const x = c * spacingX + (spacingX - wWidth) / 2;
         const y = r * spacingY + (spacingY - wHeight) / 2;
         
-        if (!isAbandoned && Math.random() > 0.4) {
+        if (!isAbandoned && Math.random() > 0.3) {
           ctx.fillStyle = windowColor;
         } else {
           ctx.fillStyle = '#1a1a1a';
@@ -125,6 +151,42 @@ class MaterialManager {
     ctx.fillStyle = '#555';
     ctx.fillRect(20, 20, 20, 20);
     ctx.fillRect(80, 80, 15, 25);
+    
+    return new THREE.CanvasTexture(canvas);
+  }
+
+  createParkTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d');
+    
+    // Grass
+    ctx.fillStyle = '#16a34a';
+    ctx.fillRect(0, 0, 256, 256);
+    
+    // Football Pitch or Playground
+    if (Math.random() > 0.5) {
+      // Football Pitch
+      ctx.strokeStyle = 'white';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(20, 40, 216, 176);
+      ctx.beginPath();
+      ctx.moveTo(128, 40);
+      ctx.lineTo(128, 216);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(128, 128, 40, 0, Math.PI * 2);
+      ctx.stroke();
+    } else {
+      // Playground / Paths
+      ctx.fillStyle = '#d1d5db'; // Grey paths
+      ctx.fillRect(120, 0, 16, 256);
+      ctx.fillRect(0, 120, 256, 16);
+      
+      ctx.fillStyle = '#facc15'; // Sand pit
+      ctx.fillRect(40, 40, 60, 60);
+    }
     
     return new THREE.CanvasTexture(canvas);
   }
