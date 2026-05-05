@@ -47,27 +47,27 @@
 - [x] Buildings within a zone tile cluster/scale based on density
 - [x] Abandoned buildings rendered in grey
 
-## 🏗️ Phase 5 — Civic Buildings & Services (IN PROGRESS)
-- [ ] Police Station (reduces crime, improves residential value)
-- [ ] Fire Station (reduces fire risk)
-- [ ] School / University (boosts R demand and land value)
-- [ ] Hospital (boosts residential desirability)
-- [ ] Park / Green Space (boosts adjacent land value)
-- [ ] Civic buildings provide AoE radius bonuses to nearby zones
-- [ ] "Coverage" overlay map to visualise service reach
+## ✅ Phase 5 — Civic Buildings & Services
+- [x] Police Station (reduces crime, improves residential value)
+- [x] Fire Station (reduces fire risk)
+- [x] School / University (boosts R demand and land value)
+- [x] Hospital (boosts residential desirability)
+- [x] Park / Green Space (boosts adjacent land value)
+- [x] Civic buildings provide AoE radius bonuses to nearby zones
+- [x] "Coverage" overlay map to visualise service reach
 
 ## 📋 Phase 6 — Advanced Simulation & Happiness
-- [ ] Agent-based "happiness" score per residential zone
-- [ ] Commute time calculation (penalises long A* paths)
-- [ ] Land value system (affected by services, traffic, green space)
-- [ ] Crime & fire risk mechanics
-- [ ] Unemployment rate derived from R/C/I job balance
-- [ ] City rating / approval system
+- [x] Agent-based "happiness" score per residential zone
+- [x] Commute time calculation (penalises long A* paths)
+- [x] Land value system (affected by services, traffic, green space)
+- [x] Crime & fire risk mechanics
+- [x] Unemployment rate derived from R/C/I job balance
+- [x] City rating / approval system
 
 ## 📋 Phase 7 — UI / UX Polish
 - [ ] Traffic congestion overlay toggle (view mode)
-- [ ] Power coverage overlay toggle
-- [ ] Water coverage overlay toggle
+- [x] Power coverage overlay toggle
+- [x] Water coverage overlay toggle
 - [ ] Mini-map panel
 - [ ] Tooltip on tile hover (population, jobs, services)
 - [ ] Notification system (zone abandoned, power shortage, etc.)

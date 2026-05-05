@@ -1,0 +1,9 @@
+You can play with the work in progress version over at https://threedeecity.happymonkey.ai/ tho I still have a snag list of issues to solve.
+A city currently needs roads, zones, with power, and water located near (power can be connected with powerlines)
+We now have light R1, C1, I1 medium R2,C2,I2, and heavy zones R3,C3,I3 with basic demand driven RCI (folks want jobs, which then drives a need for more housing).
+The basics of public transportation is also including buses and trains.
+Power options include coal or windpower (with a power bar - blue is good, orange is stressed, and red is not enough power), the water pump - the only water supply is in the power menu there.
+A lazy loading music player is also included that will play tracks whilst you play from folks over on Pixabay - activate by clicking the speaker icon at the top of the hud.
+Time pausing and accellaration works (you can't build whilst paused)
+We have a start screen where you can name your city and choose difficulty too.
+This is phase 3 of 6 to improve it to be a fully featured playable game (I ran out of time today and decided to call it a day here).

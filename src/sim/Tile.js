@@ -9,6 +9,8 @@ export class Tile {
     this.jobs = 0;
     this.developmentLevel = 0; // 0: undeveloped, 1-3: current building level
     this.abandoned = false;
+    this.happiness = 50;
+    this.commuteTime = 0;
     this.overlay = null; // e.g., 'power-line'
     this.styleId = Math.floor(Math.random() * 4); // 0-3 for visual variety
     
@@ -36,6 +38,35 @@ export class Tile {
     } else if (this.type === 'industrial') {
       this.simulateIndustrial(city);
     }
+    
+    this.simulateDisasters(city);
+  }
+
+  simulateDisasters(city) {
+    if (this.type === 'grass' || this.type === 'road' || this.type === 'highway') return;
+
+    const services = this.modules.find(m => m.name === 'Services');
+    const water = this.modules.find(m => m.name === 'Water');
+    
+    // Fire Risk
+    let fireRisk = 0.0001; // Base very small chance per tick
+    if (this.type === 'industrial') fireRisk += 0.0005 * this.density;
+    if (this.type === 'power-coal') fireRisk += 0.001;
+    if (this.abandoned) fireRisk += 0.0005;
+    if (water && !water.hasWater) fireRisk += 0.0005;
+    
+    if (services && services.coverage.fire) {
+      fireRisk *= 0.1; // 90% reduction if covered by fire station
+    }
+
+    if (Math.random() < fireRisk) {
+      // Fire breaks out, destroys building
+      this.abandoned = true;
+      this.residents = 0;
+      this.jobs = 0;
+      this.developmentLevel = 0;
+      if (city.onTileChanged) city.onTileChanged(this.x, this.y, this);
+    }
   }
 
   simulateResidential(city) {
@@ -44,6 +75,7 @@ export class Tile {
     const water = this.modules.find(m => m.name === 'Water');
     const traffic = this.modules.find(m => m.name === 'Traffic');
     const services = this.modules.find(m => m.name === 'Services');
+    const env = this.modules.find(m => m.name === 'Environment');
 
     if (!roadAccess || !roadAccess.hasAccess) {
       this.abandoned = true;
@@ -52,8 +84,28 @@ export class Tile {
       return;
     }
 
-    // High congestion leads to abandonment
-    if (traffic && traffic.congestion > 80) {
+    // Calculate Happiness
+    let happiness = 50; // Base
+    if (env) {
+      happiness += (env.landValue - 50) * 0.4;
+      if (env.pollution > 20) happiness -= 15;
+    }
+    if (traffic && traffic.congestion > 50) happiness -= 10;
+    if (this.commuteTime > 20) happiness -= (this.commuteTime - 20) * 0.5;
+    
+    // Crime penalty (based on unemployment and lack of police)
+    const unemployment = city.stats.unemployment || 0;
+    let localCrime = Math.max(0, unemployment - 5);
+    if (services && services.coverage.police) {
+      localCrime = 0; // Police suppresses crime
+    }
+    happiness -= localCrime * 2;
+    
+    happiness += (0.09 - city.taxRates.residential) * 200;
+    this.happiness = Math.max(0, Math.min(100, happiness));
+
+    // Low happiness leads to abandonment
+    if (this.happiness < 20 || (traffic && traffic.congestion > 80)) {
       this.abandoned = true;
       this.residents *= 0.95;
       if (this.residents < 1) this.developmentLevel = 0;
@@ -90,6 +142,9 @@ export class Tile {
         }
       }
     }
+    
+    // Scale growth by happiness
+    serviceMultiplier *= (this.happiness / 50);
 
     const capacity = Math.pow(this.density, 2) * 50;
     
@@ -147,6 +202,11 @@ export class Tile {
       
       if (services.coverage.park) serviceMultiplier += 0.2; // Nice areas attract shoppers
     }
+    
+    const env = this.modules.find(m => m.name === 'Environment');
+    if (env) {
+      serviceMultiplier *= (env.landValue / 50); // Higher land value boosts commercial
+    }
 
     const capacity = Math.pow(this.density, 2) * 30;
     if (this.jobs < capacity) {
@@ -196,6 +256,13 @@ export class Tile {
       } else if (this.density >= 2) {
         maxLevel = 2; // Heavy industrial requires fire protection
       }
+    }
+    
+    // Industry prefers some distance, but doesn't care about pollution as much
+    const env = this.modules.find(m => m.name === 'Environment');
+    if (env && env.landValue > 80) {
+      // High land value actually hurts heavy industry (NIMBY)
+      if (this.density === 3) serviceMultiplier *= 0.8;
     }
 
     const capacity = Math.pow(this.density, 2) * 40;

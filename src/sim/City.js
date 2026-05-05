@@ -1,5 +1,5 @@
 import { Tile } from './Tile.js';
-import { RoadAccessModule, PowerModule, WaterModule, TrafficModule, ServiceModule } from './SimModule.js';
+import { RoadAccessModule, PowerModule, WaterModule, TrafficModule, ServiceModule, EnvironmentModule } from './SimModule.js';
 import { GameConfig } from '../GameConfig.js';
 
 export class City {
@@ -12,6 +12,8 @@ export class City {
     this.waterGrid = [];
     this.trafficGrid = [];
     this.roadAccessGrid = [];
+    this.landValueGrid = [];
+    this.pollutionGrid = [];
     
     this.serviceGrids = {
       police: [],
@@ -28,7 +30,11 @@ export class City {
       date: new Date(2026, 0, 1),
       powerSupply: 0,
       powerDemand: 0,
-      demand: { residential: 0, commercial: 0, industrial: 0 }
+      demand: { residential: 0, commercial: 0, industrial: 0 },
+      happiness: 50,
+      landValue: 50,
+      unemployment: 0,
+      approval: 50
     };
     this.taxRates = { ...GameConfig.taxRates };
     this.monthlyExpenses = 0;
@@ -54,6 +60,8 @@ export class City {
       this.serviceGrids.school[x] = [];
       this.serviceGrids.hospital[x] = [];
       this.serviceGrids.park[x] = [];
+      this.landValueGrid[x] = [];
+      this.pollutionGrid[x] = [];
 
       for (let y = 0; y < this.size.height; y++) {
         const tile = new Tile(x, y);
@@ -62,11 +70,14 @@ export class City {
         tile.addModule(new WaterModule());
         tile.addModule(new TrafficModule());
         tile.addModule(new ServiceModule());
+        tile.addModule(new EnvironmentModule());
         this.grid[x][y] = tile;
         this.powerGrid[x][y] = false;
         this.waterGrid[x][y] = false;
         this.trafficGrid[x][y] = 0;
         this.roadAccessGrid[x][y] = false;
+        this.landValueGrid[x][y] = 50;
+        this.pollutionGrid[x][y] = 0;
 
         this.serviceGrids.police[x][y] = false;
         this.serviceGrids.fire[x][y] = false;
@@ -83,6 +94,8 @@ export class City {
     // Update infrastructure and traffic before tile simulation
     this.updateInfrastructureGrids();
     this.updateTraffic();
+    this.updatePollution();
+    this.updateLandValue();
 
     // Budget and lot consolidation
     if (this.stats.date.getDate() === 1) {
@@ -303,6 +316,11 @@ export class City {
   updateStats() {
     let totalPop = 0;
     let totalJobs = 0;
+    let totalHappiness = 0;
+    let resTiles = 0;
+    let totalLandValue = 0;
+    let landTiles = 0;
+
     for (let x = 0; x < this.size.width; x++) {
       for (let y = 0; y < this.size.height; y++) {
         const tile = this.grid[x][y];
@@ -310,11 +328,38 @@ export class City {
         if (tile.isAnchor) {
           totalPop += tile.residents || 0;
           totalJobs += tile.jobs || 0;
+          if (tile.type === 'residential' && tile.residents > 0) {
+            totalHappiness += tile.happiness || 50;
+            resTiles++;
+          }
+        }
+        if (tile.type === 'residential' || tile.type === 'commercial') {
+            totalLandValue += this.landValueGrid[x][y];
+            landTiles++;
         }
       }
     }
     this.stats.population = Math.floor(totalPop);
     this.stats.jobs = Math.floor(totalJobs);
+    
+    // Calculate Unemployment (assuming ~50% of population is workforce)
+    const workforce = this.stats.population * 0.5;
+    if (workforce > 0) {
+      const unemployed = Math.max(0, workforce - this.stats.jobs);
+      this.stats.unemployment = Math.floor((unemployed / workforce) * 100);
+    } else {
+      this.stats.unemployment = 0;
+    }
+
+    this.stats.happiness = resTiles > 0 ? Math.floor(totalHappiness / resTiles) : 50;
+    this.stats.landValue = landTiles > 0 ? Math.floor(totalLandValue / landTiles) : 50;
+    
+    // Calculate Approval Rating
+    let approval = this.stats.happiness;
+    const avgTax = (this.taxRates.residential + this.taxRates.commercial + this.taxRates.industrial) / 3;
+    if (avgTax > 0.09) approval -= (avgTax - 0.09) * 200; // High tax penalty
+    if (this.stats.unemployment > 5) approval -= (this.stats.unemployment - 5) * 2; // Unemployment penalty
+    this.stats.approval = Math.max(0, Math.min(100, Math.floor(approval)));
   }
 
   consolidateLots() {
@@ -379,10 +424,14 @@ export class City {
   }
 
   updateTraffic() {
-    // 1. Decay traffic
+    // 1. Decay traffic and commute time
     for (let x = 0; x < this.size.width; x++) {
       for (let y = 0; y < this.size.height; y++) {
         this.trafficGrid[x][y] *= 0.5;
+        const tile = this.grid[x][y];
+        if (tile.type === 'residential' && tile.commuteTime > 0) {
+          tile.commuteTime *= 0.95;
+        }
       }
     }
 
@@ -405,9 +454,12 @@ export class City {
       if (start && end) {
         const path = this.findPath(start, end);
         if (path) {
+          start.commuteTime = path.length;
           path.forEach(p => {
             this.trafficGrid[p.x][p.y] += 5; // Add traffic weight
           });
+        } else {
+          start.commuteTime = 50; // Penalty for no route
         }
       }
     }
@@ -474,4 +526,68 @@ export class City {
     }
     return null;
   }
+
+  updatePollution() {
+    // 1. Decay pollution
+    for (let x = 0; x < this.size.width; x++) {
+      for (let y = 0; y < this.size.height; y++) {
+        this.pollutionGrid[x][y] *= 0.5;
+      }
+    }
+    
+    // 2. Generate pollution
+    for (let x = 0; x < this.size.width; x++) {
+      for (let y = 0; y < this.size.height; y++) {
+        const tile = this.grid[x][y];
+        if (tile.type === 'power-coal') this.pollutionGrid[x][y] += 100;
+        else if (tile.type === 'industrial') this.pollutionGrid[x][y] += tile.jobs * 2;
+        else if (tile.type === 'highway') this.pollutionGrid[x][y] += (this.trafficGrid[x][y] || 0) * 0.5;
+        else if (tile.type === 'road') this.pollutionGrid[x][y] += (this.trafficGrid[x][y] || 0) * 0.2;
+      }
+    }
+    
+    // 3. Smooth pollution (spread to neighbors)
+    const newPollution = Array(this.size.width).fill(0).map(() => Array(this.size.height).fill(0));
+    for (let x = 0; x < this.size.width; x++) {
+      for (let y = 0; y < this.size.height; y++) {
+        let total = this.pollutionGrid[x][y];
+        const neighbors = [
+          { dx: 1, dy: 0 }, { dx: -1, dy: 0 },
+          { dx: 0, dy: 1 }, { dx: 0, dy: -1 },
+          { dx: 1, dy: 1 }, { dx: -1, dy: -1 },
+          { dx: 1, dy: -1 }, { dx: -1, dy: 1 }
+        ];
+        for (const { dx, dy } of neighbors) {
+          const nx = x + dx, ny = y + dy;
+          if (nx >= 0 && nx < this.size.width && ny >= 0 && ny < this.size.height) {
+            total += this.pollutionGrid[nx][ny] * 0.25;
+          }
+        }
+        newPollution[x][y] = total;
+      }
+    }
+    this.pollutionGrid = newPollution;
+  }
+
+  updateLandValue() {
+    for (let x = 0; x < this.size.width; x++) {
+      for (let y = 0; y < this.size.height; y++) {
+        let value = 50; // Base value
+        
+        // Positive modifiers
+        if (this.serviceGrids.park[x][y]) value += 20;
+        if (this.serviceGrids.school[x][y]) value += 15;
+        if (this.serviceGrids.hospital[x][y]) value += 15;
+        if (this.serviceGrids.police[x][y]) value += 10;
+        if (this.serviceGrids.fire[x][y]) value += 5;
+        
+        // Negative modifiers
+        value -= this.pollutionGrid[x][y] * 0.5;
+        value -= (this.trafficGrid[x][y] || 0) * 0.1;
+        
+        this.landValueGrid[x][y] = Math.max(0, Math.min(100, value));
+      }
+    }
+  }
 }
+

@@ -1,3 +1,5 @@
+import { Tile } from './Tile.js';
+
 export class SimModule {
   constructor() {
     this.name = 'BaseModule';
@@ -84,3 +86,18 @@ export class ServiceModule extends SimModule {
     this.coverage.park = city.serviceGrids.park[tile.x][tile.y] || false;
   }
 }
+
+export class EnvironmentModule extends SimModule {
+  constructor() {
+    super();
+    this.name = 'Environment';
+    this.landValue = 50;
+    this.pollution = 0;
+  }
+
+  simulate(tile, city) {
+    this.landValue = city.landValueGrid[tile.x][tile.y] || 50;
+    this.pollution = city.pollutionGrid[tile.x][tile.y] || 0;
+  }
+}
+

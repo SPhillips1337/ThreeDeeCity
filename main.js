@@ -205,6 +205,14 @@ class Game {
     document.getElementById('population').innerText = this.city.stats.population.toLocaleString();
     document.getElementById('money').innerText = `$${Math.floor(this.city.stats.money).toLocaleString()}`;
     document.getElementById('game-date').innerText = this.city.stats.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    
+    // New Phase 6 Stats
+    if (document.getElementById('happiness')) {
+      document.getElementById('happiness').innerText = `${this.city.stats.happiness}%`;
+      document.getElementById('land-value').innerText = `${this.city.stats.landValue}`;
+      document.getElementById('unemployment').innerText = `${this.city.stats.unemployment}%`;
+      document.getElementById('approval').innerText = `${this.city.stats.approval}%`;
+    }
 
     // Power Meter
     const powerPercent = this.city.stats.powerSupply > 0

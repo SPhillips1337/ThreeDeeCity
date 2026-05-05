@@ -1,0 +1,12 @@
+You can play with the work in progress version over at https://threedeecity.happymonkey.ai/ - lots of progress today!
+
+Today was all about making the city feel alive and responsive. Here's what we added in Phase 5:
+
+1. **Skyscrapers & Mega-Lots:** Zones now dynamically merge into 2x2 and 3x3 mega-lots when demand is high, allowing for massive high-density skyscrapers to dominate the skyline. 
+2. **Civic Services:** All 5 essential services are now live—Police, Fire, Schools, Hospitals, and Parks. Each has a unique 3D model and logic that gates higher-tier zone growth.
+3. **Traffic Heatmaps:** Roads now dynamically shift color from grey to bright red based on real-time traffic congestion. You can see the gridlock forming as your city expands!
+4. **Data View Overlays:** Added a new "Data Views" toggle (👁️) to the toolbar. You can now see real-time coverage maps for Power, Water, and all Civic Services with map-wide tinting.
+5. **Growth Dependencies:** Buildings now require specific service coverage to reach their maximum heights—your citizens won't build those R3 skyscrapers without a nearby school and hospital!
+6. **Music Player Polish:** The background music player now features a full shuffle mode, keeping the soundtrack fresh while you build.
+
+We've officially cleared Phase 5 of 6. Almost at the finish line for the fully playable simulation!

@@ -76,3 +76,13 @@ confidence: high
 - **Date:** 2026-05-04
 - **Pattern:** Reused the existing BFS (Breadth-First Search) grid logic for power/water to also map Civic Service (Police, Fire, Hospital) coverage radiuses.
 - **Lesson:** Building generalized infrastructure modules (`runBFS`) allows rapid feature expansion. Civic services now seamlessly propagate over road networks and connected zones using the same robust algorithm.
+
+## [Success] Dynamic Heatmap Visualization
+- **Date:** 2026-05-04
+- **Pattern:** Implemented a performant linear interpolation (lerp) logic in `SceneManager.js` to dynamically shift road material colors from grey to red based on the `TrafficModule` congestion metric.
+- **Lesson:** Providing visual "heatmaps" directly on the game objects (roads) instead of a separate UI layer creates a much more immersive experience. Decoupling the color shift from mesh construction ensures zero performance impact on 60FPS rendering.
+
+## [Success] Data View Overlays (Data-Driven Tinting)
+- **Date:** 2026-05-04
+- **Pattern:** Created a global "Data View" state that triggers conditional tinting across all city buildings. Buildings without coverage (Power, Water, Police, etc.) are "greyed out" while covered ones are highlighted in their service-specific color.
+- **Lesson:** Using `material.color` overrides rather than swapping textures or geometry allows for instant, full-city visual transitions. This gives players clear feedback on coverage gaps that a standard "Normal" view obscures.
