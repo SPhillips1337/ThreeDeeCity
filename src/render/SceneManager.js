@@ -236,6 +236,9 @@ export class SceneManager {
       this.objects[x] = [];
       for (let y = 0; y < city.size.height; y++) {
         this.objects[x][y] = null; // Initially null for grass
+        if (city.grid[x][y].type !== 'grass') {
+          this.updateTileVisuals(x, y, city.grid[x][y]);
+        }
       }
     }
   }
