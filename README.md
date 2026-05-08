@@ -35,8 +35,8 @@ A high-performance, 3D city-building simulation built for the web. Experience th
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/SPhillips1337/simcity.git
-   cd simcity
+   git clone https://github.com/SPhillips1337/threedeecity.git
+   cd threedeecity
    ```
 
 2. Install dependencies:
