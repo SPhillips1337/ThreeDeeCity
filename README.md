@@ -33,10 +33,32 @@ A high-performance, 3D city-building simulation built for the web. Experience th
 
 ### Installation
 
+#### Option 1: installer script
+
+Download and run the hardened installer from the repository root:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/SPhillips1337/ThreeDeeCity/main/install.sh -o install.sh
+chmod +x install.sh
+./install.sh
+```
+
+If you already cloned the repository, run the same script from inside the checkout:
+
+```bash
+./install.sh
+```
+
+The installer validates that an existing directory is a `SPhillips1337/ThreeDeeCity` checkout before installing dependencies. For a validation-only run, set `THREEDEECITY_SKIP_INSTALL=1`.
+
+Review the downloaded script before running it, especially when fetching from a mutable branch such as `main`.
+
+#### Option 2: manual setup
+
 1. Clone the repository:
    ```bash
-   git clone https://github.com/SPhillips1337/threedeecity.git
-   cd threedeecity
+   git clone https://github.com/SPhillips1337/ThreeDeeCity.git
+   cd ThreeDeeCity
    ```
 
 2. Install dependencies:
