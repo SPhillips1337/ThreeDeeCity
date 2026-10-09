@@ -12,6 +12,51 @@ export function getTileSurfaceHeight(tile) {
   return Math.max(WATER_BED_HEIGHT, elevationToWorldHeight(tile.elevation));
 }
 
+/**
+ * Height of the procedural terrain surface at a point in tile-space coordinates.
+ * The rendered heightfield (buildTerrainGeometry) is bilinear between its corner
+ * vertices, so this bilinearly samples the same vertex heights to return the true
+ * surface height at (tileX, tileY). Objects placed with getTileSurfaceHeight
+ * (a single tile's corner elevation) sink into or float above the interpolated
+ * surface on slopes — use this for anything that must sit exactly on the terrain.
+ */
+export function getTerrainHeightAt(city, tileX, tileY) {
+  const width = city.size.width;
+  const height = city.size.height;
+  // Clamp to the mesh bounds so edge sampling stays inside the grid
+  const fx = Math.max(0, Math.min(width, tileX));
+  const fy = Math.max(0, Math.min(height, tileY));
+  const x0 = Math.floor(fx);
+  const y0 = Math.floor(fy);
+  const tx = fx - x0;
+  const ty = fy - y0;
+  // Vertex (vx, vy) sits at the corner shared by tiles (vx-1, vy-1), (vx, vy-1),
+  // (vx-1, vy), (vx, vy) — same averaging as sampleVertexHeight.
+  const vertexHeight = (vx, vy) => {
+    let sum = 0;
+    let count = 0;
+    for (const x of [vx - 1, vx]) {
+      for (const y of [vy - 1, vy]) {
+        if (x >= 0 && x < width && y >= 0 && y < height) {
+          sum += getTileSurfaceHeight(city.grid[x][y]);
+          count++;
+        }
+      }
+    }
+    return count > 0 ? sum / count : WATER_BED_HEIGHT;
+  };
+  const h00 = vertexHeight(x0, y0);
+  const h10 = vertexHeight(x0 + 1, y0);
+  const h01 = vertexHeight(x0, y0 + 1);
+  const h11 = vertexHeight(x0 + 1, y0 + 1);
+  return (
+    h00 * (1 - tx) * (1 - ty) +
+    h10 * tx * (1 - ty) +
+    h01 * (1 - tx) * ty +
+    h11 * tx * ty
+  );
+}
+
 export function getTerrainColorBand({ elevation, slope = 0 }) {
   if (elevation < SEA_LEVEL - 0.08) return { name: 'deep-water-bed', color: 0x1e5f75 };
   if (elevation < SEA_LEVEL + 0.025) return { name: 'shoreline-wet-sand', color: 0x9aa36f };

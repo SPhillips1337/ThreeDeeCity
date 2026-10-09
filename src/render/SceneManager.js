@@ -4,7 +4,7 @@ import { PMREMGenerator } from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { SimObject } from './SimObject.js';
 import { ParticleSystem } from './ParticleSystem.js';
-import { buildTerrainGeometry, createWaterSurface, getTileSurfaceHeight } from './TerrainSurface.js';
+import { buildTerrainGeometry, createWaterSurface, getTerrainHeightAt } from './TerrainSurface.js';
 import { VEGETATION_BUDGETS, planVegetation } from './VegetationPlanner.js';
 import { clampPanTarget, deriveInitialCameraFrame } from './CameraRig.js';
 import { collectRendererDiagnostics, disposeObject3D } from './RenderDiagnostics.js';
@@ -27,7 +27,7 @@ export class SceneManager {
 
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color('#9fb7c9');
-    this.scene.fog = new THREE.FogExp2(0x9fb7c9, 0.018);
+    this.scene.fog = new THREE.FogExp2(0x9fb7c9, 0.012);
 
     // RoomEnvironment — free PBR environment reflections, no HDRI needed
     this.pmremGenerator = new THREE.PMREMGenerator(this.renderer);
@@ -35,6 +35,12 @@ export class SceneManager {
     this.scene.environment = this.pmremGenerator.fromScene(
       new RoomEnvironment(), 0.035
     ).texture;
+    // IBL at full strength floods the scene with uniform light from every
+    // direction (studio lights are off by default), which is what made the
+    // landscape read as bright and washed-out with no shadow definition.
+    // Pulling it down keeps PBR reflections but restores contrast so terrain
+    // shading and directional shadows carry the depth.
+    this.scene.environmentIntensity = 0.55;
 
     this.setupCamera();
     this.setupLights();
@@ -140,15 +146,17 @@ export class SceneManager {
   }
 
   setupLights() {
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.72);
+    // Ambient kept modest — a strong flat wash made the landscape read as
+    // washed-out/bright; lower values let sun shadows carry the terrain shape.
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.45);
     ambientLight.userData.isToggleable = true;
     this.scene.add(ambientLight);
 
-    const hemi = new THREE.HemisphereLight(0xb7d9ff, 0x4f6f45, 0.5);
+    const hemi = new THREE.HemisphereLight(0xb7d9ff, 0x4f6f45, 0.32);
     hemi.userData.isToggleable = true;
     this.scene.add(hemi);
 
-    const sun = new THREE.DirectionalLight(0xfff4dc, 1.35);
+    const sun = new THREE.DirectionalLight(0xfff4dc, 1.5);
     sun.position.set(50, 100, 50);
     sun.castShadow = true;
     sun.shadow.mapSize.width = 2048;
@@ -157,7 +165,9 @@ export class SceneManager {
     sun.shadow.camera.right = 50;
     sun.shadow.camera.top = 50;
     sun.shadow.camera.bottom = -50;
-    sun.userData.isToggleable = true;
+    // The key light is always on — it provides the directional shading and
+    // shadows that give terrain its depth. The "lights" toggle only controls
+    // the ambient/hemi fill, so turning lights off no longer flattens the scene.
     this.scene.add(sun);
 
     const rim = new THREE.DirectionalLight(0x9ec5ff, 0.42);
@@ -399,10 +409,11 @@ export class SceneManager {
     const matrix = new THREE.Matrix4();
 
     treeInstances.forEach((instance, index) => {
-      const tile = this.city.grid[instance.x][instance.y];
       const x = instance.x - 16 + 0.5 + instance.offsetX;
       const z = instance.y - 16 + 0.5 + instance.offsetZ;
-      const y = getTileSurfaceHeight(tile);
+      // Sample the interpolated surface at the instance's actual footprint so
+      // trees sit on slopes instead of floating or sinking (tile-space coords).
+      const y = getTerrainHeightAt(this.city, instance.x + 0.5 + instance.offsetX, instance.y + 0.5 + instance.offsetZ);
       matrix.compose(
         new THREE.Vector3(x, y + 0.16 * instance.scale, z),
         new THREE.Quaternion().setFromEuler(new THREE.Euler(0, instance.rotation, 0)),
@@ -418,9 +429,8 @@ export class SceneManager {
     });
 
     rockInstances.forEach((instance, index) => {
-      const tile = this.city.grid[instance.x][instance.y];
       matrix.compose(
-        new THREE.Vector3(instance.x - 16 + 0.5 + instance.offsetX, getTileSurfaceHeight(tile) + 0.08, instance.y - 16 + 0.5 + instance.offsetZ),
+        new THREE.Vector3(instance.x - 16 + 0.5 + instance.offsetX, getTerrainHeightAt(this.city, instance.x + 0.5 + instance.offsetX, instance.y + 0.5 + instance.offsetZ) + 0.08, instance.y - 16 + 0.5 + instance.offsetZ),
         new THREE.Quaternion().setFromEuler(new THREE.Euler(0, instance.rotation, 0)),
         new THREE.Vector3(instance.scale, instance.scale * 0.55, instance.scale),
       );
@@ -521,7 +531,7 @@ export class SceneManager {
   }
 
   updateSelection(pos) {
-    const height = getTileSurfaceHeight(this.city.grid[pos.x][pos.y]);
+    const height = getTerrainHeightAt(this.city, pos.x + 0.5, pos.y + 0.5);
     this.selectionMesh.position.set(pos.x - 16 + 0.5, height + 0.03, pos.y - 16 + 0.5);
     this.selectionMesh.visible = true;
   }
@@ -543,7 +553,7 @@ export class SceneManager {
     this.clearPreview();
     const preview = this.createPreviewMesh(toolId);
     if (!preview) return;
-    const height = getTileSurfaceHeight(this.city.grid[pos.x][pos.y]);
+    const height = getTerrainHeightAt(this.city, pos.x + 0.5, pos.y + 0.5);
     preview.position.set(pos.x - 16 + 0.5, height + 0.05, pos.y - 16 + 0.5);
     this.previewGroup.add(preview);
   }
@@ -576,7 +586,7 @@ export class SceneManager {
   addPreviewAt(x, y, toolId) {
     const preview = this.createPreviewMesh(toolId);
     if (!preview) return;
-    const height = getTileSurfaceHeight(this.city.grid[x][y]);
+    const height = getTerrainHeightAt(this.city, x + 0.5, y + 0.5);
     preview.position.set(x - 16 + 0.5, height + 0.05, y - 16 + 0.5);
     this.previewGroup.add(preview);
   }

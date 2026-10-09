@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { materials } from './MaterialManager.js';
-import { getTileSurfaceHeight } from './TerrainSurface.js';
+import { getTileSurfaceHeight, getTerrainHeightAt } from './TerrainSurface.js';
 import { createSeededRandom } from '../sim/SeededRandom.js';
 import { classifyRoadTile } from './RoadTopology.js';
 
@@ -34,9 +34,21 @@ export class SimObject extends THREE.Group {
     // If 3x3: (x+1.5, z+1.5)
     const offsetX = (w - 1) * 0.5;
     const offsetZ = (h - 1) * 0.5;
+    // Sample the true terrain surface at the lot center. The heightfield is
+    // bilinear between tile corners, so a single corner elevation
+    // (getTileSurfaceHeight) leaves objects sunk into or floating above the
+    // surface on slopes — most visible on roads "bleeding" into hills.
+    let baseY = getTileSurfaceHeight(this.tile);
+    if (this.tile.city) {
+      baseY = getTerrainHeightAt(
+        this.tile.city,
+        this.tile.x + 0.5 + offsetX,
+        this.tile.y + 0.5 + offsetZ,
+      );
+    }
     this.position.set(
       this.tile.x - 16 + 0.5 + offsetX,
-      getTileSurfaceHeight(this.tile),
+      baseY,
       this.tile.y - 16 + 0.5 + offsetZ,
     );
   }

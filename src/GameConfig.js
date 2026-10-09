@@ -67,7 +67,7 @@ export const GameConfig = {
   graphics: {
     // Defaults tuned for 60 fps mid-tier GPU
     pbr:      true,   // MeshStandardMaterial PBR — worth keeping
-    lights:   false,  // Hemisphere+rim: marginal visual lift, skip by default
+    lights:   false,  // Ambient/hemi fill only (key sun is always on)
     particles:false,  // Dust: off unless weather system enables it
     vignette: true,   // Edge darkening: essentially free, keep on
   },

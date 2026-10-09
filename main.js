@@ -673,12 +673,16 @@ class Game {
       tile.type = 'highway';
       changed = true;
     } else if (this.activeToolId === 'tool-power-line') {
-      // Allow placing power lines over roads or highways
+      // Allow placing power lines over roads or highways, or standalone on clear
+      // grass. Rejecting other tiles prevents silently clobbering buildings/zones.
       if (tile.type === 'road' || tile.type === 'highway') {
         tile.overlay = 'power-line';
-      } else {
+      } else if (tile.type === 'grass') {
         tile.type = 'power-line';
         tile.overlay = null;
+      } else {
+        this.notify('Power lines can only be placed on roads or clear land.', 'warning');
+        return;
       }
       changed = true;
     } else if (this.activeToolId === 'tool-bulldoze') {
@@ -713,18 +717,24 @@ class Game {
           return;
         }
 
-        // Check if any are occupied
-        if (tiles.every(t => t.type === 'grass')) {
-          tiles.forEach((t, i) => {
-            t.type = 'power-coal';
-            t.lotId = lotId;
-            t.isAnchor = (i === 3); // Bottom-left is anchor for SimObject centering
-            t.lotSize = { w: 2, h: 2 };
-          });
-          // Update all 4 visuals
-          tiles.forEach(t => this.sceneManager.updateTileVisuals(t.x, t.y, t));
-          changed = true;
+        // All four tiles must be clear grass — surface this instead of failing
+        // silently when the area is partially occupied.
+        if (!tiles.every(t => t.type === 'grass')) {
+          this.notify('Power plant needs a clear 2×2 area of flat land.', 'warning');
+          return;
         }
+
+        tiles.forEach((t, i) => {
+          t.type = 'power-coal';
+          t.lotId = lotId;
+          t.isAnchor = (i === 3); // Bottom-left is anchor for SimObject centering
+          t.lotSize = { w: 2, h: 2 };
+        });
+        // Update all 4 visuals
+        tiles.forEach(t => this.sceneManager.updateTileVisuals(t.x, t.y, t));
+        changed = true;
+      } else {
+        this.notify('Power plant needs a clear 2×2 area of flat land.', 'warning');
       }
     } else if (this.activeToolId === 'tool-power-wind') {
       tile.type = 'power-wind';
