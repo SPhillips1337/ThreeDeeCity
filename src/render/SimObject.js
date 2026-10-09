@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 import { materials } from './MaterialManager.js';
+import { getTileSurfaceHeight } from './TerrainSurface.js';
+import { createSeededRandom } from '../sim/SeededRandom.js';
+import { classifyRoadTile } from './RoadTopology.js';
 
 /**
  * SimObject represents a single tile's visual representation in the 3D scene.
@@ -31,7 +34,11 @@ export class SimObject extends THREE.Group {
     // If 3x3: (x+1.5, z+1.5)
     const offsetX = (w - 1) * 0.5;
     const offsetZ = (h - 1) * 0.5;
-    this.position.set(this.tile.x - 16 + 0.5 + offsetX, 0, this.tile.y - 16 + 0.5 + offsetZ);
+    this.position.set(
+      this.tile.x - 16 + 0.5 + offsetX,
+      getTileSurfaceHeight(this.tile),
+      this.tile.y - 16 + 0.5 + offsetZ,
+    );
   }
 
   updateMesh() {
@@ -85,6 +92,8 @@ export class SimObject extends THREE.Group {
 
     if (isZoned || isCivic) {
       this._addComplexBuilding(type, level, density, w, h);
+    } else if (type === 'road' || type === 'highway') {
+      this._addRoadMesh(type);
     } else {
       const geometry = this._getBasicGeometry(type);
       const material = this._getMaterial(type);
@@ -94,6 +103,48 @@ export class SimObject extends THREE.Group {
       mesh.position.y = geometry.parameters.height / 2 + 0.01;
       this.add(mesh);
     }
+  }
+
+  _addRoadMesh(type) {
+    const width = type === 'highway' ? 0.72 : 0.58;
+    const height = type === 'highway' ? 0.1 : 0.06;
+    const material = this._getMaterial(type);
+    const roadGroup = new THREE.Group();
+    roadGroup.name = 'road-visual';
+
+    const addSegment = (w, h, x = 0, z = 0) => {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, height, h), material);
+      mesh.position.set(x, height / 2 + 0.01, z);
+      mesh.receiveShadow = true;
+      roadGroup.add(mesh);
+      return mesh;
+    };
+
+    const city = this.tile.city;
+    const classification = city
+      ? classifyRoadTile(city, this.tile.x, this.tile.y)
+      : { topology: 'isolated', rotation: 0 };
+    roadGroup.userData.roadTopology = classification;
+    roadGroup.rotation.y = classification.rotation;
+
+    if (classification.topology === 'isolated' || classification.topology === 'cross') {
+      addSegment(width, 1);
+      addSegment(1, width);
+    } else if (classification.topology === 'straight') {
+      addSegment(width, 1);
+    } else if (classification.topology === 'dead-end') {
+      addSegment(width, 0.62, 0, -0.19);
+      addSegment(width * 1.2, width * 1.2, 0, 0.18);
+    } else if (classification.topology === 'corner') {
+      addSegment(width, 0.62, 0, -0.19);
+      addSegment(0.62, width, 0.19, 0);
+      addSegment(width, width);
+    } else if (classification.topology === 't') {
+      addSegment(width, 1);
+      addSegment(0.72, width, 0.14, 0);
+    }
+
+    this.add(roadGroup);
   }
 
   _addComplexBuilding(type, level, density, w, h) {
@@ -130,7 +181,7 @@ export class SimObject extends THREE.Group {
 
     // Roof details for civic
     const roofGeom = new THREE.BoxGeometry(w * 0.8, 0.05, h * 0.8);
-    const roofMat = new THREE.MeshPhongMaterial({ color: 0x333333 });
+    const roofMat = new THREE.MeshLambertMaterial({ color: 0x333333 });
     const roof = new THREE.Mesh(roofGeom, roofMat);
     roof.position.y = height + 0.03;
     this.add(roof);
@@ -147,7 +198,7 @@ export class SimObject extends THREE.Group {
     if (type === 'power-coal') {
       // Chimneys
       const chimneyGeom = new THREE.CylinderGeometry(0.2, 0.3, 1.2, 8);
-      const chimneyMat = new THREE.MeshPhongMaterial({ color: 0x555555 });
+      const chimneyMat = new THREE.MeshLambertMaterial({ color: 0x555555 });
       for (let i = 0; i < 2; i++) {
         const chimney = new THREE.Mesh(chimneyGeom, chimneyMat);
         chimney.position.set(-0.5 + i * 1.0, 1.5, 0.5);
@@ -158,7 +209,7 @@ export class SimObject extends THREE.Group {
     if (type === 'power-wind') {
       // Wind Turbine Blades
       const bladeGeom = new THREE.BoxGeometry(0.1, 1.5, 0.2);
-      const bladeMat = new THREE.MeshPhongMaterial({ color: 0xffffff });
+      const bladeMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
       for (let i = 0; i < 3; i++) {
         const blade = new THREE.Mesh(bladeGeom, bladeMat);
         blade.position.y = height;
@@ -171,7 +222,7 @@ export class SimObject extends THREE.Group {
     if (type === 'water-pump') {
       // Pipes
       const pipeGeom = new THREE.CylinderGeometry(0.15, 0.15, 0.8, 8);
-      const pipeMat = new THREE.MeshPhongMaterial({ color: 0x888888 });
+      const pipeMat = new THREE.MeshLambertMaterial({ color: 0x888888 });
       const pipe = new THREE.Mesh(pipeGeom, pipeMat);
       pipe.rotation.x = Math.PI / 2;
       pipe.position.set(0, 0.5, 0.6);
@@ -191,8 +242,9 @@ export class SimObject extends THREE.Group {
     const treeCount = Math.floor(w * h * 2);
     const coneGeom = new THREE.ConeGeometry(0.15, 0.4, 8);
     const trunkGeom = new THREE.CylinderGeometry(0.04, 0.04, 0.2);
-    const leafMat = new THREE.MeshPhongMaterial({ color: 0x166534 });
-    const trunkMat = new THREE.MeshPhongMaterial({ color: 0x451a03 });
+    const leafMat = new THREE.MeshLambertMaterial({ color: 0x166534 });
+    const trunkMat = new THREE.MeshLambertMaterial({ color: 0x451a03 });
+    const random = createSeededRandom(`park:${this.tile.x}:${this.tile.y}:${this.tile.styleId}`);
 
     for (let i = 0; i < treeCount; i++) {
       const tree = new THREE.Group();
@@ -205,9 +257,9 @@ export class SimObject extends THREE.Group {
       
       // Random position within park, avoid the football pitch area (center)
       tree.position.set(
-        (Math.random() - 0.5) * (w - 0.5),
+        (random() - 0.5) * (w - 0.5),
         0.05,
-        (Math.random() - 0.5) * (h - 0.5)
+        (random() - 0.5) * (h - 0.5)
       );
       
       // Don't place trees in the middle if it's a large park (football pitch area)
@@ -226,7 +278,7 @@ export class SimObject extends THREE.Group {
 
     const roofGeom = new THREE.ConeGeometry(size * 0.7, 0.3, 4);
     roofGeom.rotateY(Math.PI / 4);
-    const roofMat = new THREE.MeshPhongMaterial({ color: 0x444444 });
+    const roofMat = new THREE.MeshLambertMaterial({ color: 0x444444 });
     const roof = new THREE.Mesh(roofGeom, roofMat);
     roof.position.y = height + 0.15;
     this.add(roof);
@@ -253,7 +305,7 @@ export class SimObject extends THREE.Group {
       if (i === tiers - 1) {
         if (type === 'commercial') {
           const antennaGeom = new THREE.BoxGeometry(0.05, 1.0, 0.05);
-          const antenna = new THREE.Mesh(antennaGeom, new THREE.MeshPhongMaterial({ color: 0x333333 }));
+          const antenna = new THREE.Mesh(antennaGeom, new THREE.MeshLambertMaterial({ color: 0x333333 }));
           antenna.position.y = totalHeight + 0.5;
           this.add(antenna);
         } else {
@@ -300,7 +352,7 @@ export class SimObject extends THREE.Group {
 
     // Roof detail
     const roofGeom = new THREE.BoxGeometry(w * 0.8, 0.05, h * 0.8);
-    const roofMat = new THREE.MeshPhongMaterial({ color: 0x333333 });
+    const roofMat = new THREE.MeshLambertMaterial({ color: 0x333333 });
     const roof = new THREE.Mesh(roofGeom, roofMat);
     roof.position.y = height + 0.025;
     this.add(roof);
@@ -308,7 +360,7 @@ export class SimObject extends THREE.Group {
 
   _createOverlayMesh() {
     const geometry = new THREE.BoxGeometry(0.1, 1.2, 0.1);
-    const material = new THREE.MeshPhongMaterial({ color: 0xaaaaaa });
+    const material = new THREE.MeshLambertMaterial({ color: 0xaaaaaa });
     const mesh = new THREE.Mesh(geometry, material);
     mesh.castShadow = true;
     mesh.position.y = 0.65;
@@ -391,7 +443,10 @@ export class SimObject extends THREE.Group {
 
   updateTrafficColor(congestion) {
     if (!this.children || this.children.length === 0) return;
-    const mesh = this.children.find(c => c.isMesh && c.material);
+    let mesh = null;
+    this.traverse(child => {
+      if (!mesh && child.isMesh && child.material) mesh = child;
+    });
     if (!mesh || !mesh.material.color) return;
 
     // Clone the material if it hasn't been cloned yet so we don't modify the global cache

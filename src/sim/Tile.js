@@ -1,5 +1,7 @@
+import { randomInt } from './SeededRandom.js';
+
 export class Tile {
-  constructor(x, y) {
+  constructor(x, y, random = Math.random) {
     this.x = x;
     this.y = y;
     this.type = 'grass'; // grass, residential, commercial, industrial, road
@@ -12,7 +14,7 @@ export class Tile {
     this.happiness = 50;
     this.commuteTime = 0;
     this.overlay = null; // e.g., 'power-line'
-    this.styleId = Math.floor(Math.random() * 4); // 0-3 for visual variety
+    this.styleId = randomInt(random, 4); // 0-3 for visual variety
     
     // Lot Consolidation
     this.lotId = null;
@@ -59,7 +61,7 @@ export class Tile {
       fireRisk *= 0.1; // 90% reduction if covered by fire station
     }
 
-    if (Math.random() < fireRisk) {
+    if ((city.random ? city.random() : Math.random()) < fireRisk) {
       // Fire breaks out, destroys building
       this.abandoned = true;
       this.residents = 0;
@@ -158,7 +160,7 @@ export class Tile {
     if (this.residents < capacity && hasInfrastructure) {
       // Growth slowed by traffic, boosted by services
       const trafficPenalty = traffic ? Math.max(0, (traffic.congestion / 100)) : 0;
-      const growth = (5 + Math.random() * 5) * serviceMultiplier * (1 - trafficPenalty); 
+      const growth = (5 + (city.random ? city.random() : Math.random()) * 5) * serviceMultiplier * (1 - trafficPenalty);
       this.residents += Math.max(0, growth);
     }
 
@@ -218,7 +220,7 @@ export class Tile {
     const capacity = Math.pow(this.density, 2) * 30;
     if (this.jobs < capacity) {
       const trafficPenalty = traffic ? Math.max(0, (traffic.congestion / 80)) : 0;
-      this.jobs += Math.random() * 3 * serviceMultiplier * (1 - trafficPenalty);
+      this.jobs += (city.random ? city.random() : Math.random()) * 3 * serviceMultiplier * (1 - trafficPenalty);
     }
 
     if (this.jobs > capacity * 0.8 && this.developmentLevel < maxLevel) {
@@ -275,7 +277,7 @@ export class Tile {
     const capacity = Math.pow(this.density, 2) * 40;
     if (this.jobs < capacity) {
       const trafficPenalty = traffic ? Math.max(0, (traffic.congestion / 120)) : 0;
-      this.jobs += Math.random() * 4 * serviceMultiplier * (1 - trafficPenalty);
+      this.jobs += (city.random ? city.random() : Math.random()) * 4 * serviceMultiplier * (1 - trafficPenalty);
     }
 
     if (this.jobs > capacity * 0.8 && this.developmentLevel < maxLevel) {

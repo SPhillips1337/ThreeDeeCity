@@ -61,5 +61,39 @@ export const GameConfig = {
     easy: 50000,
     medium: 20000,
     hard: 10000
+  },
+
+  // ─── Graphics Settings ───────────────────────────────────────────────────────
+  graphics: {
+    // Defaults tuned for 60 fps mid-tier GPU
+    pbr:      true,   // MeshStandardMaterial PBR — worth keeping
+    lights:   false,  // Hemisphere+rim: marginal visual lift, skip by default
+    particles:false,  // Dust: off unless weather system enables it
+    vignette: true,   // Edge darkening: essentially free, keep on
+  },
+
+  /**
+   * Load saved graphics settings from localStorage, apply defaults for missing keys.
+   * Call once at startup before any 3D scene is created.
+   */
+  loadGraphics() {
+    try {
+      const saved = JSON.parse(localStorage.getItem('threedeecity-graphics') || '{}');
+      for (const [key, val] of Object.entries(saved)) {
+        if (this.graphics.hasOwnProperty(key)) {
+          this.graphics[key] = val;
+        }
+      }
+    } catch (_) { /* corrupted JSON — ignore */ }
+  },
+
+  /**
+   * Persist and apply a single graphics setting.
+   * @param {string} key   Setting key (e.g. 'vignette')
+   * @param {boolean} val  New value
+   */
+  setGraphic(key, val) {
+    this.graphics[key] = val;
+    localStorage.setItem('threedeecity-graphics', JSON.stringify(this.graphics));
   }
 };

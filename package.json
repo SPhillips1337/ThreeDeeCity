@@ -6,9 +6,12 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node --test test/*.test.js",
+    "test:smoke": "playwright test"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "vite": "^6.0.0"
   },
   "dependencies": {
