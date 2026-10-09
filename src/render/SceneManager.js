@@ -1,9 +1,17 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { PMREMGenerator } from 'three';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { SimObject } from './SimObject.js';
+import { ParticleSystem } from './ParticleSystem.js';
+import { buildTerrainGeometry, createWaterSurface, getTileSurfaceHeight } from './TerrainSurface.js';
+import { VEGETATION_BUDGETS, planVegetation } from './VegetationPlanner.js';
+import { clampPanTarget, deriveInitialCameraFrame } from './CameraRig.js';
+import { collectRendererDiagnostics, disposeObject3D } from './RenderDiagnostics.js';
 
 export class SceneManager {
   constructor(city) {
+    this.city = city;
     this.canvas = document.getElementById('game-canvas');
     this.renderer = new THREE.WebGLRenderer({
       canvas: this.canvas,
@@ -13,9 +21,20 @@ export class SceneManager {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.0;
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color('#0a0a0c');
+    this.scene.background = new THREE.Color('#9fb7c9');
+    this.scene.fog = new THREE.FogExp2(0x9fb7c9, 0.018);
+
+    // RoomEnvironment — free PBR environment reflections, no HDRI needed
+    this.pmremGenerator = new THREE.PMREMGenerator(this.renderer);
+    this.pmremGenerator.compileEquirectangularShader();
+    this.scene.environment = this.pmremGenerator.fromScene(
+      new RoomEnvironment(), 0.035
+    ).texture;
 
     this.setupCamera();
     this.setupLights();
@@ -24,10 +43,13 @@ export class SceneManager {
     this.objects = []; // 2D array of SimObjects
     this.currentDataView = 'none';
     this.initObjects(city);
+    this.vegetationQuality = 'medium';
+    this.vegetationDirty = true;
+    this.rebuildVegetation();
 
     this.selectionMesh = new THREE.Mesh(
       new THREE.PlaneGeometry(1, 1),
-      new THREE.MeshPhongMaterial({ color: 0xffffff, transparent: true, opacity: 0.2 })
+      new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0.2 })
     );
     this.selectionMesh.rotation.x = -Math.PI / 2;
     this.selectionMesh.position.y = 0.02;
@@ -44,8 +66,10 @@ export class SceneManager {
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.05;
     this.controls.screenSpacePanning = true;
-    this.controls.minDistance = 10;
-    this.controls.maxDistance = 100;
+    const frame = deriveInitialCameraFrame(city);
+    this.controls.target.set(frame.target.x, frame.target.y, frame.target.z);
+    this.controls.minDistance = frame.controls.minDistance;
+    this.controls.maxDistance = frame.controls.maxDistance;
     this.controls.maxPolarAngle = Math.PI / 2.1;
     
     this.controls.mouseButtons = {
@@ -53,36 +77,78 @@ export class SceneManager {
       MIDDLE: THREE.MOUSE.DOLLY,
       RIGHT: THREE.MOUSE.ROTATE
     };
+
+    this.particles = new ParticleSystem(this.scene, 400);
+
+    // === Vignette overlay (2D quad in front of camera) ===
+    {
+      const vc = document.createElement('canvas');
+      vc.width = 512;
+      vc.height = 512;
+      const vCtx = vc.getContext('2d');
+      const grad = vCtx.createRadialGradient(256, 256, 120, 256, 256, 340);
+      grad.addColorStop(0, 'rgba(0,0,0,0)');
+      grad.addColorStop(1, 'rgba(0,0,0,0.55)');
+      vCtx.fillStyle = grad;
+      vCtx.fillRect(0, 0, 512, 512);
+      const vTex = new THREE.CanvasTexture(vc);
+      const vMat = new THREE.MeshBasicMaterial({
+        map: vTex,
+        transparent: true,
+        depthWrite: false,
+        depthTest: false,
+      });
+      const vGeom = new THREE.PlaneGeometry(2, 2);
+      this.vignetteMesh = new THREE.Mesh(vGeom, vMat);
+      this.vignetteMesh.frustumCulled = false;
+      this.vignetteMesh.renderOrder = 9999;
+      this.camera.add(this.vignetteMesh);
+    }
   }
 
-  setPanEnabled(enabled) {
+    setPanEnabled(enabled) {
     this.controls.mouseButtons.LEFT = enabled ? THREE.MOUSE.PAN : null;
   }
 
+  setVignetteEnabled(v) {
+    if (this.vignetteMesh) this.vignetteMesh.visible = v;
+  }
+
   reset(city) {
+    this.city = city;
     // Remove all simulation objects
     for (let x = 0; x < this.objects.length; x++) {
       for (let y = 0; y < this.objects[x].length; y++) {
         if (this.objects[x][y]) {
+          disposeObject3D(this.objects[x][y]);
           this.scene.remove(this.objects[x][y]);
         }
       }
     }
     this.objects = [];
+    this.setupGrid(city);
     this.initObjects(city);
+    this.vegetationDirty = true;
+    this.rebuildVegetation();
   }
 
   setupCamera() {
     this.camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-    this.camera.position.set(40, 40, 40);
-    this.camera.lookAt(0, 0, 0);
+    const frame = deriveInitialCameraFrame(this.city);
+    this.camera.position.set(frame.position.x, frame.position.y, frame.position.z);
+    this.camera.lookAt(frame.target.x, frame.target.y, frame.target.z);
   }
 
   setupLights() {
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8); // Increased from 0.5
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.72);
+    ambientLight.userData.isToggleable = true;
     this.scene.add(ambientLight);
 
-    const sun = new THREE.DirectionalLight(0xffffff, 1.2); // Increased from 1.0
+    const hemi = new THREE.HemisphereLight(0xb7d9ff, 0x4f6f45, 0.5);
+    hemi.userData.isToggleable = true;
+    this.scene.add(hemi);
+
+    const sun = new THREE.DirectionalLight(0xfff4dc, 1.35);
     sun.position.set(50, 100, 50);
     sun.castShadow = true;
     sun.shadow.mapSize.width = 2048;
@@ -91,22 +157,41 @@ export class SceneManager {
     sun.shadow.camera.right = 50;
     sun.shadow.camera.top = 50;
     sun.shadow.camera.bottom = -50;
+    sun.userData.isToggleable = true;
     this.scene.add(sun);
+
+    const rim = new THREE.DirectionalLight(0x9ec5ff, 0.42);
+    rim.position.set(-30, 10, -40);
+    rim.userData.isRimLight = true;   // lights-toggle keeps this on
+    this.scene.add(rim);
   }
 
   setupGrid(city) {
-    const gridHelper = new THREE.GridHelper(city.size.width, city.size.width, 0x444444, 0x222222);
-    gridHelper.position.y = 0.01;
-    this.scene.add(gridHelper);
+    for (const surface of [this.terrain, this.waterSurface]) {
+      if (!surface) continue;
+      this.scene.remove(surface);
+      surface.geometry.dispose();
+      surface.material.dispose();
+    }
 
-    const terrainGeometry = new THREE.PlaneGeometry(city.size.width, city.size.height);
-    const terrainMaterial = new THREE.MeshPhongMaterial({ color: 0x3a5a3a }); // More vibrant grass green
+    const terrainGeometry = buildTerrainGeometry(city);
+    const terrainMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      vertexColors: true,
+      roughness: 0.92,
+      metalness: 0,
+      flatShading: false,
+    });
     const terrain = new THREE.Mesh(terrainGeometry, terrainMaterial);
     terrain.rotation.x = -Math.PI / 2;
     terrain.position.set(0, 0, 0);
     terrain.receiveShadow = true;
     terrain.name = 'terrain'; // Name for raycasting
     this.scene.add(terrain);
+    this.terrain = terrain;
+
+    this.waterSurface = createWaterSurface(city);
+    this.scene.add(this.waterSurface);
   }
 
   getGridPosition(event) {
@@ -166,7 +251,7 @@ export class SceneManager {
         
         if (adj.length > 0) {
           this.tourCurrentTarget = this.tourNextTarget.clone();
-          this.tourNextTarget = adj[Math.floor(Math.random() * adj.length)].pos;
+          this.tourNextTarget = adj[Math.floor(this.city.random() * adj.length)].pos;
         } else {
           // Dead end, just turn around
           const temp = this.tourNextTarget.clone();
@@ -183,6 +268,7 @@ export class SceneManager {
     }
 
     this.controls.update();
+    if (this.vegetationDirty) this.rebuildVegetation();
     
     // Only update objects that actually changed
     for (let x = 0; x < this.objects.length; x++) {
@@ -206,7 +292,10 @@ export class SceneManager {
       }
     }
 
+    this.particles.update();
+
     this.renderer.render(this.scene, this.camera);
+    this.renderDiagnostics = collectRendererDiagnostics(this.renderer);
   }
 
   handleKeyboard(keys) {
@@ -237,6 +326,17 @@ export class SceneManager {
       this.controls.target.addScaledVector(right, moveSpeed);
     }
 
+    const clamped = clampPanTarget(this.city, this.controls.target, 0);
+    const delta = new THREE.Vector3(
+      clamped.x - this.controls.target.x,
+      clamped.y - this.controls.target.y,
+      clamped.z - this.controls.target.z,
+    );
+    if (delta.lengthSq() > 0) {
+      this.controls.target.set(clamped.x, clamped.y, clamped.z);
+      this.camera.position.add(delta);
+    }
+
     // Rotation (Q/E)
     const rotationSpeed = 0.03;
     if (keys['KeyQ'] || keys['KeyE']) {
@@ -252,7 +352,7 @@ export class SceneManager {
       this.objects[x] = [];
       for (let y = 0; y < city.size.height; y++) {
         this.objects[x][y] = null; // Initially null for grass
-        if (city.grid[x][y].type !== 'grass') {
+        if (!['grass', 'water'].includes(city.grid[x][y].type)) {
           this.updateTileVisuals(x, y, city.grid[x][y]);
         }
       }
@@ -261,15 +361,100 @@ export class SceneManager {
 
   updateTileVisuals(x, y, tile) {
     if (this.objects[x][y]) {
+      disposeObject3D(this.objects[x][y]);
       this.scene.remove(this.objects[x][y]);
       this.objects[x][y] = null;
     }
 
-    if (tile.type !== 'grass') {
+    if (!['grass', 'water'].includes(tile.type)) {
       const obj = new SimObject(tile);
       this.objects[x][y] = obj;
       this.scene.add(obj);
       this.applyDataViewTint(obj, tile);
+    }
+    this.vegetationDirty = true;
+  }
+
+  rebuildVegetation() {
+    if (this.vegetationGroup) {
+      disposeObject3D(this.vegetationGroup);
+      this.scene.remove(this.vegetationGroup);
+    }
+
+    const plan = planVegetation(this.city, { quality: this.vegetationQuality });
+    const group = new THREE.Group();
+    group.name = 'vegetation';
+
+    const treeInstances = plan.instances.filter(instance => instance.kind === 'tree');
+    const rockInstances = plan.instances.filter(instance => instance.kind === 'rock');
+    const trunkGeometry = new THREE.CylinderGeometry(0.035, 0.055, 0.32, 6);
+    const canopyGeometry = new THREE.ConeGeometry(0.18, 0.42, 7);
+    const rockGeometry = new THREE.DodecahedronGeometry(0.12, 0);
+    const trunkMaterial = new THREE.MeshLambertMaterial({ color: 0x5a351f });
+    const canopyMaterial = new THREE.MeshLambertMaterial({ color: 0x2f6f3f });
+    const rockMaterial = new THREE.MeshLambertMaterial({ color: 0x7f8177 });
+    const trunkMesh = new THREE.InstancedMesh(trunkGeometry, trunkMaterial, treeInstances.length);
+    const canopyMesh = new THREE.InstancedMesh(canopyGeometry, canopyMaterial, treeInstances.length);
+    const rockMesh = new THREE.InstancedMesh(rockGeometry, rockMaterial, rockInstances.length);
+    const matrix = new THREE.Matrix4();
+
+    treeInstances.forEach((instance, index) => {
+      const tile = this.city.grid[instance.x][instance.y];
+      const x = instance.x - 16 + 0.5 + instance.offsetX;
+      const z = instance.y - 16 + 0.5 + instance.offsetZ;
+      const y = getTileSurfaceHeight(tile);
+      matrix.compose(
+        new THREE.Vector3(x, y + 0.16 * instance.scale, z),
+        new THREE.Quaternion().setFromEuler(new THREE.Euler(0, instance.rotation, 0)),
+        new THREE.Vector3(instance.scale, instance.scale, instance.scale),
+      );
+      trunkMesh.setMatrixAt(index, matrix);
+      matrix.compose(
+        new THREE.Vector3(x, y + 0.45 * instance.scale, z),
+        new THREE.Quaternion().setFromEuler(new THREE.Euler(0, instance.rotation, 0)),
+        new THREE.Vector3(instance.scale, instance.scale, instance.scale),
+      );
+      canopyMesh.setMatrixAt(index, matrix);
+    });
+
+    rockInstances.forEach((instance, index) => {
+      const tile = this.city.grid[instance.x][instance.y];
+      matrix.compose(
+        new THREE.Vector3(instance.x - 16 + 0.5 + instance.offsetX, getTileSurfaceHeight(tile) + 0.08, instance.y - 16 + 0.5 + instance.offsetZ),
+        new THREE.Quaternion().setFromEuler(new THREE.Euler(0, instance.rotation, 0)),
+        new THREE.Vector3(instance.scale, instance.scale * 0.55, instance.scale),
+      );
+      rockMesh.setMatrixAt(index, matrix);
+    });
+
+    for (const mesh of [trunkMesh, canopyMesh, rockMesh]) {
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      mesh.instanceMatrix.needsUpdate = true;
+      group.add(mesh);
+    }
+
+    group.userData.diagnostics = {
+      quality: this.vegetationQuality,
+      maxInstances: VEGETATION_BUDGETS[this.vegetationQuality].maxInstances,
+      instances: plan.instances.length,
+      trees: treeInstances.length,
+      rocks: rockInstances.length,
+    };
+    this.scene.add(group);
+    this.vegetationGroup = group;
+    this.vegetationDirty = false;
+  }
+
+  refreshRoadAndNeighbors(x, y) {
+    for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx;
+      const ny = y + dy;
+      if (nx < 0 || nx >= this.city.size.width || ny < 0 || ny >= this.city.size.height) continue;
+      const tile = this.city.grid[nx][ny];
+      if (tile.type === 'road' || tile.type === 'highway' || dx === 0 && dy === 0) {
+        this.updateTileVisuals(nx, ny, tile);
+      }
     }
   }
 
@@ -336,7 +521,8 @@ export class SceneManager {
   }
 
   updateSelection(pos) {
-    this.selectionMesh.position.set(pos.x - 16 + 0.5, 0.02, pos.y - 16 + 0.5);
+    const height = getTileSurfaceHeight(this.city.grid[pos.x][pos.y]);
+    this.selectionMesh.position.set(pos.x - 16 + 0.5, height + 0.03, pos.y - 16 + 0.5);
     this.selectionMesh.visible = true;
   }
 
@@ -348,8 +534,7 @@ export class SceneManager {
   clearPreview() {
     while (this.previewGroup.children.length > 0) {
       const child = this.previewGroup.children[0];
-      child.geometry.dispose();
-      child.material.dispose();
+      disposeObject3D(child);
       this.previewGroup.remove(child);
     }
   }
@@ -358,7 +543,8 @@ export class SceneManager {
     this.clearPreview();
     const preview = this.createPreviewMesh(toolId);
     if (!preview) return;
-    preview.position.set(pos.x - 16 + 0.5, 0.05, pos.y - 16 + 0.5);
+    const height = getTileSurfaceHeight(this.city.grid[pos.x][pos.y]);
+    preview.position.set(pos.x - 16 + 0.5, height + 0.05, pos.y - 16 + 0.5);
     this.previewGroup.add(preview);
   }
 
@@ -390,7 +576,8 @@ export class SceneManager {
   addPreviewAt(x, y, toolId) {
     const preview = this.createPreviewMesh(toolId);
     if (!preview) return;
-    preview.position.set(x - 16 + 0.5, 0.05, y - 16 + 0.5);
+    const height = getTileSurfaceHeight(this.city.grid[x][y]);
+    preview.position.set(x - 16 + 0.5, height + 0.05, y - 16 + 0.5);
     this.previewGroup.add(preview);
   }
 
@@ -406,7 +593,7 @@ export class SceneManager {
 
     const mesh = new THREE.Mesh(
       new THREE.BoxGeometry(0.9, 0.1, 0.9),
-      new THREE.MeshPhongMaterial({ color, transparent: true, opacity: 0.5 })
+      new THREE.MeshLambertMaterial({ color, transparent: true, opacity: 0.5 })
     );
     return mesh;
   }
@@ -436,7 +623,7 @@ export class SceneManager {
       this.originalControlsTarget = this.controls.target.clone();
       
       // Pick a random starting road
-      const start = this.tourRoads[Math.floor(Math.random() * this.tourRoads.length)];
+      const start = this.tourRoads[Math.floor(this.city.random() * this.tourRoads.length)];
       this.tourCurrentTarget = new THREE.Vector3(start.x - 16 + 0.5, 0.5, start.y - 16 + 0.5);
       
       // Find initial next target
@@ -452,13 +639,13 @@ export class SceneManager {
         }
       }
       
-      this.tourNextTarget = adj.length > 0 ? adj[Math.floor(Math.random() * adj.length)] : this.tourCurrentTarget;
+      this.tourNextTarget = adj.length > 0 ? adj[Math.floor(this.city.random() * adj.length)] : this.tourCurrentTarget;
       
       this.camera.position.copy(this.tourCurrentTarget);
       this.controls.target.copy(this.tourNextTarget);
       
       this.controls.minDistance = 0.1;
-      this.controls.maxDistance = 100;
+      this.controls.maxDistance = deriveInitialCameraFrame(city).controls.maxDistance;
       this.controls.maxPolarAngle = Math.PI; // allow looking around freely
       
       document.getElementById('tool-tour').classList.add('active');
@@ -467,8 +654,9 @@ export class SceneManager {
       this.camera.position.copy(this.originalCameraPos);
       this.controls.target.copy(this.originalControlsTarget);
       
-      this.controls.minDistance = 10;
-      this.controls.maxDistance = 100;
+      const frame = deriveInitialCameraFrame(city);
+      this.controls.minDistance = frame.controls.minDistance;
+      this.controls.maxDistance = frame.controls.maxDistance;
       this.controls.maxPolarAngle = Math.PI / 2.1;
       
       document.getElementById('tool-tour').classList.remove('active');

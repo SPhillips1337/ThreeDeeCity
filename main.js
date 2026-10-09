@@ -3,14 +3,29 @@ import { SceneManager } from './src/render/SceneManager.js';
 import { City } from './src/sim/City.js';
 import { GameConfig } from './src/GameConfig.js';
 import { AudioManager } from './src/AudioManager.js';
+import { validateTerrainPlacement } from './src/sim/TerrainPlacement.js';
 
 class Game {
   constructor() {
+    // Load saved graphics settings before the 3-D scene is created
+    GameConfig.loadGraphics();
+
     this.city = new City(32, 32);
+    window.__THREEDEECITY_DIAGNOSTICS__ = () => this.city.getRuntimeDiagnostics();
+    window.__THREEDEECITY_GAME__ = this;
+    window.__THREEDEECITY_VALIDATE__ = (x, y, toolId) => validateTerrainPlacement(this.city, x, y, toolId);
     this.city.onTileChanged = (x, y, tile) => {
       this.sceneManager.updateTileVisuals(x, y, tile);
     };
     this.sceneManager = new SceneManager(this.city);
+
+    // Apply saved graphics state on startup
+    const g = GameConfig.graphics;
+    this.sceneManager.setVignetteEnabled(g.vignette);
+    this.sceneManager.particles?.setVisible(g.particles);
+    this.sceneManager.scene.children.forEach(child => {
+      if (child.userData.isToggleable) child.visible = g.lights;
+    });
 
     this.activeToolId = 'tool-select';
     this.lastTickTime = 0;
@@ -305,6 +320,9 @@ class Game {
     const cityName = this.city.name;
     const difficulty = this.selectedDifficulty;
     this.city = new City(32, 32);
+    window.__THREEDEECITY_DIAGNOSTICS__ = () => this.city.getRuntimeDiagnostics();
+    window.__THREEDEECITY_GAME__ = this;
+    window.__THREEDEECITY_VALIDATE__ = (x, y, toolId) => validateTerrainPlacement(this.city, x, y, toolId);
     this.city.name = cityName;
     this.city.setDifficulty(difficulty);
     this.city.onTileChanged = (x, y, tile) => {
@@ -383,13 +401,36 @@ class Game {
         <p><a href="https://github.com/SPhillips1337/ThreeDeeCity" target="_blank">View on GitHub →</a></p>
       `,
       options: `
-        <h3>Game Options</h3>
-        <p style="color: #888;">Settings are coming in a future update. Currently the game auto-optimizes based on your hardware.</p>
+        <h3>Graphics</h3>
+        <p style="color:#888; margin-bottom:20px;">Toggle rendering features on or off. Changes take effect immediately.</p>
+
+        <div class="gfx-section-header">Rendering</div>
+        <div class="gfx-row"><span class="gfx-label"><span>PBR Materials</span><span class="gfx-hint">Physics-based shading with roughness &amp; metalness</span></span><input type="checkbox" class="gfx-toggle" id="gfx-pbr" data-key="pbr" checked></div>
+        <div class="gfx-row"><span class="gfx-label"><span>Studio Lighting</span><span class="gfx-hint">Hemisphere + rim light for depth</span></span><input type="checkbox" class="gfx-toggle" id="gfx-lights" data-key="lights" checked></div>
+
+        <div class="gfx-section-header">Atmosphere</div>
+        <div class="gfx-row"><span class="gfx-label"><span>Dust Particles</span><span class="gfx-hint">Floating dust-mote atmosphere layer</span></span><input type="checkbox" class="gfx-toggle" id="gfx-particles" data-key="particles" checked></div>
+        <div class="gfx-row"><span class="gfx-label"><span>Vignette</span><span class="gfx-hint">Soft edge-darkening vignette overlay</span></span><input type="checkbox" class="gfx-toggle" id="gfx-vignette" data-key="vignette" checked></div>
       `
     };
 
     title.innerText = page.charAt(0).toUpperCase() + page.slice(1);
     body.innerHTML = content[page] || '<p>Content not found.</p>';
+
+    // ─── Wire graphics toggles when the options modal opens ───
+    if (page === 'options') {
+      const toggles = body.querySelectorAll('.gfx-toggle');
+      toggles.forEach(toggle => {
+        toggle.checked = GameConfig.graphics[toggle.dataset.key];
+        toggle.addEventListener('change', () => {
+          const key = toggle.dataset.key;
+          const val = toggle.checked;
+          GameConfig.setGraphic(key, val);
+          this._applyGfxSetting(key, val);
+        });
+      });
+    }
+
     modal.classList.remove('hidden');
   }
 
@@ -405,6 +446,34 @@ class Game {
     }
 
     this.sceneManager.update(this.city, this.keys);
+  }
+
+  /**
+   * Apply a live graphics setting change from the options modal toggle.
+   * Only settings that can be toggled mid-session without a rebuild are applied here.
+   * PBR requires a full material rebuild — saved but acknowledged; page refresh recommended.
+   */
+  _applyGfxSetting(key, val) {
+    switch (key) {
+      case 'vignette':
+        this.sceneManager?.setVignetteEnabled(val);
+        break;
+      case 'particles':
+        this.sceneManager?.particles?.setVisible(val);
+        break;
+      case 'lights':
+        if (this.sceneManager?.scene) {
+          this.sceneManager.scene.children.forEach(child => {
+            if (child.userData.isToggleable) child.visible = val;
+          });
+        }
+        break;
+      case 'pbr':
+        // PBR materials baked at Mesh creation time; cannot toggle live.
+        // Consumed here so a key with no MLP does not throw; value already saved.
+        console.info('[Graphics] PBR toggled in CSS — refresh page to see full effect.');
+        break;
+    }
   }
 
   setupEventListeners() {
@@ -570,12 +639,13 @@ class Game {
     const cost = this.getToolCost(this.activeToolId);
     if (this.city.stats.money < cost) return;
 
-    const tile = this.city.grid[x][y];
-    
-    // Prevent building on water, except bulldozing (which does nothing to water anyway, but safe to allow)
-    if (tile.type === 'water' && this.activeToolId !== 'tool-bulldoze' && this.activeToolId !== 'tool-water-pump') {
+    const validation = validateTerrainPlacement(this.city, x, y, this.activeToolId);
+    if (!validation.ok) {
+      this.notify(validation.reason, 'warning');
       return;
     }
+
+    const tile = this.city.grid[x][y];
 
     let changed = false;
 
@@ -635,6 +705,14 @@ class Game {
           this.city.grid[x-1][y-1]
         ];
 
+        const invalid = tiles
+          .map(t => validateTerrainPlacement(this.city, t.x, t.y, this.activeToolId))
+          .find(result => !result.ok);
+        if (invalid) {
+          this.notify(invalid.reason, 'warning');
+          return;
+        }
+
         // Check if any are occupied
         if (tiles.every(t => t.type === 'grass')) {
           tiles.forEach((t, i) => {
@@ -682,7 +760,11 @@ class Game {
 
     if (changed) {
       this.city.stats.money -= cost;
-      this.sceneManager.updateTileVisuals(x, y, tile);
+      if (['tool-road', 'tool-highway', 'tool-bulldoze'].includes(this.activeToolId)) {
+        this.sceneManager.refreshRoadAndNeighbors(x, y);
+      } else {
+        this.sceneManager.updateTileVisuals(x, y, tile);
+      }
       this.updateUI();
     }
   }
@@ -746,15 +828,15 @@ class Game {
 
   checkCityEvents() {
     // Power shortages
-    if (this.city.stats.powerDemand > this.city.stats.powerSupply && Math.random() < 0.1) {
+    if (this.city.stats.powerDemand > this.city.stats.powerSupply && this.city.random() < 0.1) {
       this.notify('Rolling blackouts! Build more power plants.', 'danger');
     }
     // High unemployment
-    if (this.city.stats.unemployment > 10 && Math.random() < 0.05) {
+    if (this.city.stats.unemployment > 10 && this.city.random() < 0.05) {
       this.notify('High unemployment is causing crime to spike.', 'warning');
     }
     // Low approval
-    if (this.city.stats.approval < 30 && Math.random() < 0.05) {
+    if (this.city.stats.approval < 30 && this.city.random() < 0.05) {
       this.notify('Approval rating is plummeting. Citizens demand better conditions!', 'danger');
     }
     

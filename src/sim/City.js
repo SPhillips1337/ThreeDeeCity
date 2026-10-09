@@ -2,11 +2,14 @@ import { Tile } from './Tile.js';
 import { RoadAccessModule, PowerModule, WaterModule, TrafficModule, ServiceModule, EnvironmentModule } from './SimModule.js';
 import { GameConfig } from '../GameConfig.js';
 import { createNoise2D } from 'simplex-noise';
+import { createSeededRandom } from './SeededRandom.js';
 
 export class City {
-  constructor(width, height) {
+  constructor(width, height, options = {}) {
     this.name = 'New City';
     this.size = { width, height };
+    this.seed = options.seed ?? 'threedeecity-default';
+    this.random = createSeededRandom(this.seed);
     this.grid = [];
     
     this.powerGrid = [];
@@ -49,7 +52,7 @@ export class City {
   }
 
   init() {
-    const noise2D = createNoise2D();
+    const noise2D = createNoise2D(createSeededRandom(`${this.seed}:terrain`));
 
     for (let x = 0; x < this.size.width; x++) {
       this.grid[x] = [];
@@ -73,7 +76,8 @@ export class City {
         const e = 1 * noise2D(nx, ny) + 0.5 * noise2D(2 * nx, 2 * ny) + 0.25 * noise2D(4 * nx, 4 * ny);
         const elevation = Math.max(0, Math.min(1, (e + 1.75) / 3.5)); // Normalize roughly to 0..1
 
-        const tile = new Tile(x, y);
+        const tile = new Tile(x, y, this.random);
+        tile.city = this;
         tile.elevation = elevation;
         
         // Sea level at 0.35
@@ -102,6 +106,14 @@ export class City {
         this.serviceGrids.park[x][y] = false;
       }
     }
+  }
+
+  getRuntimeDiagnostics() {
+    return {
+      seed: this.seed,
+      width: this.size.width,
+      height: this.size.height,
+    };
   }
 
   simulate() {
@@ -479,8 +491,8 @@ export class City {
     // Limit number of pathfinding calls per tick for performance
     const samples = Math.min(residentialTiles.length, 10);
     for (let i = 0; i < samples; i++) {
-      const start = residentialTiles[Math.floor(Math.random() * residentialTiles.length)];
-      const end = jobTiles[Math.floor(Math.random() * jobTiles.length)];
+      const start = residentialTiles[Math.floor(this.random() * residentialTiles.length)];
+      const end = jobTiles[Math.floor(this.random() * jobTiles.length)];
       if (start && end) {
         const path = this.findPath(start, end);
         if (path) {
@@ -620,4 +632,3 @@ export class City {
     }
   }
 }
-
