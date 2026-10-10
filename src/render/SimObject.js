@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import { materials } from './MaterialManager.js';
 import { getTileSurfaceHeight, getTerrainHeightAt } from './TerrainSurface.js';
 import { createSeededRandom } from '../sim/SeededRandom.js';
-import { classifyRoadTile } from './RoadTopology.js';
+import { classifyRoadTile, ROAD_BITS, getRoadNeighborMask } from './RoadTopology.js';
+import { POWER_POLE_HEIGHT, POWER_CROSSARM_Y, POWER_INSULATOR_OFFSET, getPowerNeighborMask } from './PowerWires.js';
 
 /**
  * SimObject represents a single tile's visual representation in the 3D scene.
@@ -106,6 +107,8 @@ export class SimObject extends THREE.Group {
       this._addComplexBuilding(type, level, density, w, h);
     } else if (type === 'road' || type === 'highway') {
       this._addRoadMesh(type);
+    } else if (type === 'power-line') {
+      this._createOverlayMesh(); // standalone pole on grass
     } else {
       const geometry = this._getBasicGeometry(type);
       const material = this._getMaterial(type);
@@ -119,44 +122,97 @@ export class SimObject extends THREE.Group {
 
   _addRoadMesh(type) {
     const width = type === 'highway' ? 0.72 : 0.58;
-    const height = type === 'highway' ? 0.1 : 0.06;
     const material = this._getMaterial(type);
-    const roadGroup = new THREE.Group();
-    roadGroup.name = 'road-visual';
-
-    const addSegment = (w, h, x = 0, z = 0) => {
-      const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, height, h), material);
-      mesh.position.set(x, height / 2 + 0.01, z);
-      mesh.receiveShadow = true;
-      roadGroup.add(mesh);
-      return mesh;
-    };
 
     const city = this.tile.city;
-    const classification = city
-      ? classifyRoadTile(city, this.tile.x, this.tile.y)
-      : { topology: 'isolated', rotation: 0 };
-    roadGroup.userData.roadTopology = classification;
-    roadGroup.rotation.y = classification.rotation;
+    const mask = city
+      ? getRoadNeighborMask(city, this.tile.x, this.tile.y)
+      : 0;
+    const hw = width / 2;
+    // Lift the road bed slightly above the terrain surface so it never
+    // z-fights the ground mesh while still hugging slopes continuously.
+    const LIFT = 0.02;
 
-    if (classification.topology === 'isolated' || classification.topology === 'cross') {
-      addSegment(width, 1);
-      addSegment(1, width);
-    } else if (classification.topology === 'straight') {
-      addSegment(width, 1);
-    } else if (classification.topology === 'dead-end') {
-      addSegment(width, 0.62, 0, -0.19);
-      addSegment(width * 1.2, width * 1.2, 0, 0.18);
-    } else if (classification.topology === 'corner') {
-      addSegment(width, 0.62, 0, -0.19);
-      addSegment(0.62, width, 0.19, 0);
-      addSegment(width, width);
-    } else if (classification.topology === 't') {
-      addSegment(width, 1);
-      addSegment(0.72, width, 0.14, 0);
+    // Terrain-hugging ribbon: every vertex is sampled from the shared
+    // heightfield, so adjacent road tiles meet exactly at their common edge —
+    // no gaps, no per-tile box steps on slopes. The old per-tile flat boxes
+    // read as separate slabs because each sat level at its own tile's height.
+    // Vertices are parent-local: the group origin is already at the tile-center
+    // surface, so storing absolute height here doubles the slope and reopens
+    // the gaps this ribbon was meant to close.
+    const baseY = this.position.y;
+    const surf = (lx, lz) => {
+      const h = city
+        ? getTerrainHeightAt(city, this.tile.x + 0.5 + lx, this.tile.y + 0.5 + lz)
+        : baseY;
+      return h + LIFT - baseY;
+    };
+
+    const positions = [];
+    const indices = [];
+    // Append one quad given four tile-local corners in perimeter order.
+    // Winding is resolved from the actual (sloped) geometry so the normal
+    // always points up, regardless of which way the terrain tilts.
+    const addQuad = (a, b, c, d) => {
+      const base = positions.length / 3;
+      for (const p of [a, b, c, d]) positions.push(p[0], surf(p[0], p[1]), p[1]);
+      const ux = b[0] - a[0], uy = surf(b[0], b[1]) - surf(a[0], a[1]), uz = b[1] - a[1];
+      const vx = c[0] - a[0], vy = surf(c[0], c[1]) - surf(a[0], a[1]), vz = c[1] - a[1];
+      // (u x v).y < 0 means the perimeter order is CW seen from above; in
+      // that case the upward-facing triangles are (a,c,b) and (c,a,d). The
+      // else branch is the mirror image for CCW order.
+      if (ux * vz - uz * vx > 0) indices.push(base, base + 2, base + 1, base + 2, base, base + 3);
+      else indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
+    };
+
+    const count = [ROAD_BITS.north, ROAD_BITS.east, ROAD_BITS.south, ROAD_BITS.west]
+      .filter(bit => (mask & bit) !== 0).length;
+
+    if (count === 0) {
+      // Isolated road pad (transient while the player is still laying it out)
+      addQuad([-hw, -hw], [hw, -hw], [hw, hw], [-hw, hw]);
+    } else if (count === 1) {
+      const cw = hw * 1.2; // cul-de-sac mouth half-width at the closed end
+      if (mask & ROAD_BITS.north) {
+        addQuad([-hw, -0.5], [hw, -0.5], [hw, 0], [-hw, 0]);          // stub toward N
+        addQuad([-cw, 0], [cw, 0], [cw, 0.5], [-cw, 0.5]);            // mouth at S end
+      } else if (mask & ROAD_BITS.south) {
+        addQuad([-hw, 0], [hw, 0], [hw, 0.5], [-hw, 0.5]);
+        addQuad([-cw, -0.5], [cw, -0.5], [cw, 0], [-cw, 0]);
+      } else if (mask & ROAD_BITS.east) {
+        addQuad([0, -hw], [0.5, -hw], [0.5, hw], [0, hw]);
+        addQuad([-0.5, -cw], [0, -cw], [0, cw], [-0.5, cw]);
+      } else { // west
+        addQuad([-0.5, -hw], [0, -hw], [0, hw], [-0.5, hw]);
+        addQuad([0, -cw], [0.5, -cw], [0.5, cw], [0, cw]);
+      }
+    } else if ((mask & (ROAD_BITS.north | ROAD_BITS.south)) === (ROAD_BITS.north | ROAD_BITS.south)
+               && (mask & (ROAD_BITS.east | ROAD_BITS.west)) === 0) {
+      // Straight N-S: one full strip
+      addQuad([-hw, -0.5], [hw, -0.5], [hw, 0.5], [-hw, 0.5]);
+    } else if ((mask & (ROAD_BITS.east | ROAD_BITS.west)) === (ROAD_BITS.east | ROAD_BITS.west)
+               && (mask & (ROAD_BITS.north | ROAD_BITS.south)) === 0) {
+      // Straight E-W: one full strip
+      addQuad([-0.5, -hw], [0.5, -hw], [0.5, hw], [-0.5, hw]);
+    } else {
+      // Corner / T / cross: central square + a stub per open direction.
+      // The tiling is non-overlapping, so no z-fighting at junctions.
+      addQuad([-hw, -hw], [hw, -hw], [hw, hw], [-hw, hw]);
+      if (mask & ROAD_BITS.north) addQuad([-hw, -0.5], [hw, -0.5], [hw, -hw], [-hw, -hw]);
+      if (mask & ROAD_BITS.south) addQuad([-hw, hw], [hw, hw], [hw, 0.5], [-hw, 0.5]);
+      if (mask & ROAD_BITS.east)  addQuad([hw, -hw], [0.5, -hw], [0.5, hw], [hw, hw]);
+      if (mask & ROAD_BITS.west)  addQuad([-0.5, -hw], [-hw, -hw], [-hw, hw], [-0.5, hw]);
     }
 
-    this.add(roadGroup);
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setIndex(indices);
+    geometry.computeVertexNormals();
+
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.name = 'road-visual';
+    mesh.receiveShadow = true;
+    this.add(mesh);
   }
 
   _addComplexBuilding(type, level, density, w, h) {
@@ -371,17 +427,45 @@ export class SimObject extends THREE.Group {
   }
 
   _createOverlayMesh() {
-    const geometry = new THREE.BoxGeometry(0.1, 1.2, 0.1);
-    const material = new THREE.MeshLambertMaterial({ color: 0xaaaaaa });
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.castShadow = true;
-    mesh.position.y = 0.65;
-    this.add(mesh);
+    // Utility pole: tapered shaft + crossarm. The crossarm is oriented along
+    // the road/line direction when this sits on a road (overlay), so wires
+    // read as running down the line rather than across it.
+    const material = new THREE.MeshLambertMaterial({ color: 0x6b4a2f });
+
+    const poleGeom = new THREE.CylinderGeometry(0.035, 0.07, POWER_POLE_HEIGHT, 6);
+    const pole = new THREE.Mesh(poleGeom, material);
+    pole.castShadow = true;
+    pole.position.y = POWER_POLE_HEIGHT / 2 + 0.01;
+    this.add(pole);
+
+    const city = this.tile.city;
+    let rotY = 0;
+    if (city) {
+      // Crossarm is perpendicular to the power span so the insulators sit
+      // where the cables actually leave the pole. Road neighbours are not a
+      // proxy: a line on grass has none, and a line on a road may not follow it.
+      const mask = getPowerNeighborMask(city, this.tile.x, this.tile.y);
+      const ns = ((mask & ROAD_BITS.north) ? 1 : 0) + ((mask & ROAD_BITS.south) ? 1 : 0);
+      const ew = ((mask & ROAD_BITS.east) ? 1 : 0) + ((mask & ROAD_BITS.west) ? 1 : 0);
+      if (ew > ns) rotY = Math.PI / 2;
+    }
 
     const armGeom = new THREE.BoxGeometry(0.6, 0.05, 0.05);
     const arm = new THREE.Mesh(armGeom, material);
-    arm.position.y = 1.0;
+    arm.castShadow = true;
+    arm.position.y = POWER_CROSSARM_Y + 0.01;
+    arm.rotation.y = rotY;
     this.add(arm);
+
+    // Insulators: two small dark nubs at the crossarm ends where wires hang.
+    const insGeom = new THREE.CylinderGeometry(0.02, 0.02, 0.06, 5);
+    const insMat = new THREE.MeshLambertMaterial({ color: 0x1c1c22 });
+    for (const s of [1, -1]) {
+      const ins = new THREE.Mesh(insGeom, insMat);
+      if (rotY === 0) ins.position.set(POWER_INSULATOR_OFFSET * s, POWER_CROSSARM_Y - 0.03, 0);
+      else ins.position.set(0, POWER_CROSSARM_Y - 0.03, POWER_INSULATOR_OFFSET * s);
+      this.add(ins);
+    }
   }
 
   _createServiceAlerts() {

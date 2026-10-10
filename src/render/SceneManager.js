@@ -8,6 +8,7 @@ import { buildTerrainGeometry, createWaterSurface, getTerrainHeightAt } from './
 import { VEGETATION_BUDGETS, planVegetation } from './VegetationPlanner.js';
 import { clampPanTarget, deriveInitialCameraFrame } from './CameraRig.js';
 import { collectRendererDiagnostics, disposeObject3D } from './RenderDiagnostics.js';
+import { PowerWireNetwork } from './PowerWires.js';
 
 export class SceneManager {
   constructor(city) {
@@ -52,6 +53,11 @@ export class SceneManager {
     this.vegetationQuality = 'medium';
     this.vegetationDirty = true;
     this.rebuildVegetation();
+
+    // Power-line wire network: renders sagging cables between adjacent
+    // powered tiles. Rebuilt whenever a tile change can add/remove a span.
+    this.powerWires = new PowerWireNetwork(this.scene);
+    this.powerWires.rebuild(city);
 
     this.selectionMesh = new THREE.Mesh(
       new THREE.PlaneGeometry(1, 1),
@@ -136,6 +142,8 @@ export class SceneManager {
     this.initObjects(city);
     this.vegetationDirty = true;
     this.rebuildVegetation();
+    // Rebuild the wire network for the new city state.
+    this.powerWires.rebuild(city);
   }
 
   setupCamera() {
@@ -383,6 +391,9 @@ export class SceneManager {
       this.applyDataViewTint(obj, tile);
     }
     this.vegetationDirty = true;
+    // A tile change can add or remove a wire span (power-line placed or
+    // removed, or a powered neighbour changed). Rebuild the network.
+    this.powerWires.rebuild(this.city);
   }
 
   rebuildVegetation() {
