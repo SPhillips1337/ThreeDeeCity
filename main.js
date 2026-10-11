@@ -57,6 +57,16 @@ class Game {
       this.sceneManager.onResize();
     });
 
+    // Auto-save on teardown: a synchronous localStorage write is the only
+    // storage guaranteed to land before the page goes away. Never overwrites a
+    // manual save — it writes its own autosave slot that loadGame falls back to.
+    const autoSave = () => {
+      if (!this.city) return;
+      try { this.saveStore.autoSave(serializeCity(this.city)); } catch { /* best-effort */ }
+    };
+    window.addEventListener('pagehide', autoSave);
+    window.addEventListener('beforeunload', autoSave);
+
     // Setup Overlay
     const setupOverlay = document.getElementById('setup-overlay');
     const startBtn = document.getElementById('start-game-btn');
@@ -348,7 +358,13 @@ class Game {
 
   async loadGame() {
     try {
-      const raw = await this.saveStore.read();
+      let raw = await this.saveStore.read();
+      let fromAutoSave = false;
+      if (raw === undefined || raw === null) {
+        // No manual save — fall back to the last auto-save written on teardown.
+        raw = await this.saveStore.autoRead?.();
+        fromAutoSave = raw !== undefined && raw !== null;
+      }
       if (raw === undefined || raw === null) {
         this.notify('No saved city found.', 'warning');
         return;
@@ -368,7 +384,7 @@ class Game {
       document.getElementById('city-name').innerText = this.city.name;
       this.sceneManager.reset(this.city);
       this.updateUI();
-      this.notify(`Loaded ${this.city.name}.`, 'success');
+      this.notify(fromAutoSave ? `Recovered ${this.city.name} from auto-save.` : `Loaded ${this.city.name}.`, 'success');
     } catch (err) {
       this.notify(`Load failed: ${err.message}`, 'warning');
     }

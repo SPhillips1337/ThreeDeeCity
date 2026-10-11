@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { City } from '../src/sim/City.js';
-import { serializeCity, deserializeCity, applyCityState, SAVE_VERSION } from '../src/sim/SaveLoad.js';
+import { serializeCity, deserializeCity, applyCityState, createSaveStore, SAVE_VERSION } from '../src/sim/SaveLoad.js';
 
 const SEED = 'save-load-test-seed';
 
@@ -104,4 +104,36 @@ test('deserializeCity rejects malformed and inconsistent input', () => {
   const doc = deserializeCity(serializeCity(makeCity()));
   const shortTiles = JSON.stringify({ ...doc, tiles: doc.tiles.slice(0, 5) });
   assert.throws(() => deserializeCity(shortTiles), /tile count/i);
+});
+
+test('auto-save writes a separate slot and loadGame falls back to it', () => {
+  // Stub a minimal localStorage so createSaveStore takes its sync path (Node has
+  // no window/indexedDB). The auto-save slot must be distinct from the manual one.
+  const backing = new Map();
+  globalThis.localStorage = {
+    getItem: (k) => (backing.has(k) ? backing.get(k) : null),
+    setItem: (k, v) => { backing.set(k, String(v)); },
+    removeItem: (k) => { backing.delete(k); }
+  };
+
+  const store = createSaveStore(() => undefined); // no IndexedDB -> localStorage path
+  const a = makeCity();
+  editCity(a);
+  const manual = serializeCity(a);
+
+  // A manual save and an auto-save must occupy different keys.
+  return Promise.resolve(store.write(manual)).then(() => {
+    store.autoSave(manual);
+    assert.ok(backing.has('threedeecity-save'), 'manual save stored under its key');
+    assert.ok(backing.has('threedeecity-autosave'), 'auto-save stored under a separate key');
+
+    // When there is NO manual save, autoRead returns the auto-saved state.
+    backing.delete('threedeecity-save');
+    return store.autoRead().then((raw) => {
+      assert.equal(raw, manual);
+      const restored = deserializeCity(raw);
+      assert.equal(restored.name, 'Testville');
+      assert.equal(restored.stats.money, 4242);
+    });
+  }).finally(() => { delete globalThis.localStorage; });
 });

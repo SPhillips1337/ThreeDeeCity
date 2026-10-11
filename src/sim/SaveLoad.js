@@ -18,6 +18,7 @@
 
 export const SAVE_VERSION = 1;
 const STORAGE_KEY = 'threedeecity-save';
+export const AUTOSAVE_KEY = 'threedeecity-autosave';
 
 // Per-tile fields that are authoritative (not derived). Everything else on a
 // Tile is either structural (x, y, modules) or recomputed each tick.
@@ -140,12 +141,21 @@ export function createSaveStore(getFactory = () => window.indexedDB, key = STORA
         const raw = localStorage.getItem(key);
         return raw === null ? undefined : raw;
       }),
-      write: (serialized) => enqueue(async () => { localStorage.setItem(key, serialized); })
+      write: (serialized) => enqueue(async () => { localStorage.setItem(key, serialized); }),
+      autoSave: (serialized) => { try { localStorage.setItem(AUTOSAVE_KEY, serialized); } catch { /* best-effort */ } },
+      autoRead: async () => { const raw = localStorage.getItem(AUTOSAVE_KEY); return raw === null ? undefined : raw; }
     };
   }
 
   return {
     read: () => enqueue(() => idbTransact()),
-    write: (serialized) => enqueue(() => idbTransact(serialized))
+    write: (serialized) => enqueue(() => idbTransact(serialized)),
+    // On pagehide/beforeunload only a SYNCHRONOUS storage write is guaranteed to
+    // complete before the page goes away — an async IndexedDB transaction may be
+    // torn down mid-flight. So auto-save always uses localStorage, best-effort:
+    // it never throws and never blocks teardown. A manual save (write) still
+    // prefers IndexedDB for durability.
+    autoSave: (serialized) => { try { localStorage.setItem(AUTOSAVE_KEY, serialized); } catch { /* best-effort */ } },
+    autoRead: async () => { const raw = localStorage.getItem(AUTOSAVE_KEY); return raw === null ? undefined : raw; }
   };
 }
