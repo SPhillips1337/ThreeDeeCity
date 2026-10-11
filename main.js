@@ -4,6 +4,7 @@ import { City } from './src/sim/City.js';
 import { GameConfig } from './src/GameConfig.js';
 import { AudioManager } from './src/AudioManager.js';
 import { validateTerrainPlacement } from './src/sim/TerrainPlacement.js';
+import { serializeCity, deserializeCity, applyCityState, createSaveStore } from './src/sim/SaveLoad.js';
 
 class Game {
   constructor() {
@@ -11,6 +12,7 @@ class Game {
     GameConfig.loadGraphics();
 
     this.city = new City(32, 32);
+    this.saveStore = createSaveStore();
     window.__THREEDEECITY_DIAGNOSTICS__ = () => this.city.getRuntimeDiagnostics();
     window.__THREEDEECITY_GAME__ = this;
     window.__THREEDEECITY_VALIDATE__ = (x, y, toolId) => validateTerrainPlacement(this.city, x, y, toolId);
@@ -132,7 +134,7 @@ class Game {
     const mainMenu = document.getElementById('main-menu');
     
     menuToggle.addEventListener('click', (e) => {
-      e.stopPropagation();
+      e.stopPropagation(); // keep the document click handler from hiding it again
       mainMenu.classList.toggle('hidden');
     });
 
@@ -146,6 +148,8 @@ class Game {
         this.restartGame();
       }
     });
+    document.getElementById('menu-save').addEventListener('click', () => this.saveGame());
+    document.getElementById('menu-load').addEventListener('click', () => this.loadGame());
 
     document.getElementById('menu-help').addEventListener('click', () => this.showModal('help'));
     document.getElementById('menu-credits').addEventListener('click', () => this.showModal('credits'));
@@ -320,6 +324,7 @@ class Game {
     const cityName = this.city.name;
     const difficulty = this.selectedDifficulty;
     this.city = new City(32, 32);
+    this.saveStore = createSaveStore();
     window.__THREEDEECITY_DIAGNOSTICS__ = () => this.city.getRuntimeDiagnostics();
     window.__THREEDEECITY_GAME__ = this;
     window.__THREEDEECITY_VALIDATE__ = (x, y, toolId) => validateTerrainPlacement(this.city, x, y, toolId);
@@ -330,6 +335,43 @@ class Game {
     };
     this.sceneManager.reset(this.city);
     this.updateUI();
+  }
+
+  async saveGame() {
+    try {
+      await this.saveStore.write(serializeCity(this.city));
+      this.notify('City saved.', 'success');
+    } catch (err) {
+      this.notify(`Save failed: ${err.message}`, 'warning');
+    }
+  }
+
+  async loadGame() {
+    try {
+      const raw = await this.saveStore.read();
+      if (raw === undefined || raw === null) {
+        this.notify('No saved city found.', 'warning');
+        return;
+      }
+      const state = deserializeCity(raw);
+      // Rebuild a city from the saved seed/size so terrain matches, then apply
+      // the authoritative tile + stats state. Derived grids recompute on the
+      // next simulate tick; sceneManager.reset() rebuilds all visuals.
+      this.city = new City(state.size.width, state.size.height, { seed: state.seed });
+      window.__THREEDEECITY_DIAGNOSTICS__ = () => this.city.getRuntimeDiagnostics();
+      window.__THREEDEECITY_GAME__ = this;
+      window.__THREEDEECITY_VALIDATE__ = (x, y, toolId) => validateTerrainPlacement(this.city, x, y, toolId);
+      applyCityState(this.city, state);
+      this.city.onTileChanged = (x, y, tile) => {
+        this.sceneManager.updateTileVisuals(x, y, tile);
+      };
+      document.getElementById('city-name').innerText = this.city.name;
+      this.sceneManager.reset(this.city);
+      this.updateUI();
+      this.notify(`Loaded ${this.city.name}.`, 'success');
+    } catch (err) {
+      this.notify(`Load failed: ${err.message}`, 'warning');
+    }
   }
 
   showModal(page) {
