@@ -53,27 +53,37 @@ function roadWorldVertices(sim) {
   return verts;
 }
 
-test('adjacent road ribbons meet on the interpolated surface, not at double height', () => {
+// World z maps to tile-space y via +16 (the -16 world offset cancels the +0.5
+// centering), so the interpolated surface height at a vertex's own position is
+// getTerrainHeightAt(city, xCenter, worldZ + 16). This is what the mesh stores,
+// plus LIFT. Used to prove no height doubling on slopes.
+const surfaceY = (city, worldZ) => getTerrainHeightAt(city, 1.5, worldZ + 16) + LIFT;
+
+test('adjacent road ribbons overlap across the shared edge and sit on the interpolated surface', () => {
   const city = slopedRoadCity();
-  const south = new SimObject(city.grid[1][1]);
-  const north = new SimObject(city.grid[1][2]);
+  const south = new SimObject(city.grid[1][1]); // y=1, dead-end pointing S (stub reaches N)
+  const north = new SimObject(city.grid[1][2]); // y=2, dead-end pointing N (stub reaches S)
   const boundaryZ = (1 - 16 + 1); // shared edge between tile y=1 and y=2
 
-  const southEdge = roadWorldVertices(south).filter(v => Math.abs(v.z - boundaryZ) < 1e-4);
-  const northEdge = roadWorldVertices(north).filter(v => Math.abs(v.z - boundaryZ) < 1e-4);
-  assert.ok(southEdge.length >= 2, 'south road must reach the shared edge');
-  assert.ok(northEdge.length >= 2, 'north road must reach the shared edge');
+  const southVerts = roadWorldVertices(south);
+  const northVerts = roadWorldVertices(north);
 
-  const expectedY = getTerrainHeightAt(city, 1.5, 2) + LIFT;
-  for (const vertex of [...southEdge, ...northEdge]) {
+  // The seam fix: each ribbon now extends PAST the boundary into its neighbour's
+  // cell instead of stopping exactly at it, so anti-aliasing can't leave a crack.
+  const southCrossesNorth = southVerts.filter(v => v.z > boundaryZ);
+  const northCrossesSouth = northVerts.filter(v => v.z < boundaryZ);
+  assert.ok(southCrossesNorth.length >= 2, 'south ribbon must extend past the shared edge into the north tile');
+  assert.ok(northCrossesSouth.length >= 2, 'north ribbon must extend past the shared edge into the south tile');
+
+  // No height doubling: every vertex of both ribbons — including the ones now in
+  // the overlap band — sits exactly on the interpolated surface + LIFT. The old
+  // per-tile boxes doubled the slope here because they stored absolute height in
+  // a group already placed at the tile-center surface.
+  for (const v of [...southVerts, ...northVerts]) {
+    const expected = surfaceY(city, v.z);
     assert.ok(
-      Math.abs(vertex.y - expectedY) < 1e-4,
-      `edge vertex y=${vertex.y} expected surface+lift ${expectedY}`,
+      Math.abs(v.y - expected) < 1e-4,
+      `vertex at z=${v.z} has y=${v.y}, expected interpolated surface+lift ${expected}`,
     );
-  }
-
-  for (const s of southEdge) {
-    const match = northEdge.some(n => Math.abs(n.x - s.x) < 1e-4 && Math.abs(n.y - s.y) < 1e-4);
-    assert.ok(match, `south edge vertex (${s.x}, ${s.y}) has no matching north vertex`);
   }
 });

@@ -131,6 +131,19 @@ export class SimObject extends THREE.Group {
       ? getRoadNeighborMask(city, this.tile.x, this.tile.y)
       : 0;
     const hw = width / 2;
+    // Adjacent road tiles are separate meshes (draw calls), so their shared
+    // edges meet edge-to-edge at identical depth and anti-aliasing leaves a
+    // sub-pixel crack where the terrain shows through as hairline green seams.
+    // Extend every extent by `e` so neighbours overlap across that boundary.
+    // The overlap is the same flat colour and height on both sides, so it never
+    // z-fights (depth ties only flicker when the two surfaces differ) — it just
+    // covers the seam. A tiny bleed past the outer edge into grass is
+    // imperceptible. `e` must be large enough that the overlap band rasterizes
+    // as several pixels at typical zoom: at ~45 px/tile a 0.012 overlap was only
+    // ~1px and intermittently left a hairline, so 0.045 (~4px) is used instead.
+    const e = 0.045;
+    const w = hw + e;     // outer half-extent / shared-boundary reach
+    const end = 0.5 + e;  // tile-edge reach for straight strips and stubs
     // Lift the road bed slightly above the terrain surface so it never
     // z-fights the ground mesh while still hugging slopes continuously.
     const LIFT = 0.02;
@@ -172,38 +185,41 @@ export class SimObject extends THREE.Group {
 
     if (count === 0) {
       // Isolated road pad (transient while the player is still laying it out)
-      addQuad([-hw, -hw], [hw, -hw], [hw, hw], [-hw, hw]);
+      addQuad([-w, -w], [w, -w], [w, w], [-w, w]);
     } else if (count === 1) {
-      const cw = hw * 1.2; // cul-de-sac mouth half-width at the closed end
+      const cw = w * 1.2; // cul-de-sac mouth half-width at the closed end
       if (mask & ROAD_BITS.north) {
-        addQuad([-hw, -0.5], [hw, -0.5], [hw, 0], [-hw, 0]);          // stub toward N
-        addQuad([-cw, 0], [cw, 0], [cw, 0.5], [-cw, 0.5]);            // mouth at S end
+        addQuad([-w, -end], [w, -end], [w, 0], [-w, 0]);          // stub toward N
+        addQuad([-cw, 0], [cw, 0], [cw, end], [-cw, end]);        // mouth at S end
       } else if (mask & ROAD_BITS.south) {
-        addQuad([-hw, 0], [hw, 0], [hw, 0.5], [-hw, 0.5]);
-        addQuad([-cw, -0.5], [cw, -0.5], [cw, 0], [-cw, 0]);
+        addQuad([-w, 0], [w, 0], [w, end], [-w, end]);
+        addQuad([-cw, -end], [cw, -end], [cw, 0], [-cw, 0]);
       } else if (mask & ROAD_BITS.east) {
-        addQuad([0, -hw], [0.5, -hw], [0.5, hw], [0, hw]);
-        addQuad([-0.5, -cw], [0, -cw], [0, cw], [-0.5, cw]);
+        addQuad([0, -w], [end, -w], [end, w], [0, w]);
+        addQuad([-end, -cw], [0, -cw], [0, cw], [-end, cw]);
       } else { // west
-        addQuad([-0.5, -hw], [0, -hw], [0, hw], [-0.5, hw]);
-        addQuad([0, -cw], [0.5, -cw], [0.5, cw], [0, cw]);
+        addQuad([-end, -w], [0, -w], [0, w], [-end, w]);
+        addQuad([0, -cw], [end, -cw], [end, cw], [0, cw]);
       }
     } else if ((mask & (ROAD_BITS.north | ROAD_BITS.south)) === (ROAD_BITS.north | ROAD_BITS.south)
                && (mask & (ROAD_BITS.east | ROAD_BITS.west)) === 0) {
-      // Straight N-S: one full strip
-      addQuad([-hw, -0.5], [hw, -0.5], [hw, 0.5], [-hw, 0.5]);
+      // Straight N-S: one full strip, extended past both tile edges so it
+      // overlaps its neighbours and covers the rasterization seam.
+      addQuad([-w, -end], [w, -end], [w, end], [-w, end]);
     } else if ((mask & (ROAD_BITS.east | ROAD_BITS.west)) === (ROAD_BITS.east | ROAD_BITS.west)
                && (mask & (ROAD_BITS.north | ROAD_BITS.south)) === 0) {
-      // Straight E-W: one full strip
-      addQuad([-0.5, -hw], [0.5, -hw], [0.5, hw], [-0.5, hw]);
+      // Straight E-W: one full strip, extended past both tile edges.
+      addQuad([-end, -w], [end, -w], [end, w], [-end, w]);
     } else {
       // Corner / T / cross: central square + a stub per open direction.
-      // The tiling is non-overlapping, so no z-fighting at junctions.
-      addQuad([-hw, -hw], [hw, -hw], [hw, hw], [-hw, hw]);
-      if (mask & ROAD_BITS.north) addQuad([-hw, -0.5], [hw, -0.5], [hw, -hw], [-hw, -hw]);
-      if (mask & ROAD_BITS.south) addQuad([-hw, hw], [hw, hw], [hw, 0.5], [-hw, 0.5]);
-      if (mask & ROAD_BITS.east)  addQuad([hw, -hw], [0.5, -hw], [0.5, hw], [hw, hw]);
-      if (mask & ROAD_BITS.west)  addQuad([-0.5, -hw], [-hw, -hw], [-hw, hw], [-0.5, hw]);
+      // Every extent overlaps its neighbour by `e`, so junctions are seamless.
+      // The overlap is identical flat colour and height on both sides — the two
+      // surfaces coincide exactly, so there is no z-fighting to flicker.
+      addQuad([-w, -w], [w, -w], [w, w], [-w, w]);
+      if (mask & ROAD_BITS.north) addQuad([-w, -end], [w, -end], [w, -w], [-w, -w]);
+      if (mask & ROAD_BITS.south) addQuad([-w, w], [w, w], [w, end], [-w, end]);
+      if (mask & ROAD_BITS.east)  addQuad([w, -w], [end, -w], [end, w], [w, w]);
+      if (mask & ROAD_BITS.west)  addQuad([-end, -w], [-w, -w], [-w, w], [-end, w]);
     }
 
     const geometry = new THREE.BufferGeometry();
