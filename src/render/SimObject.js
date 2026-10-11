@@ -21,6 +21,8 @@ export class SimObject extends THREE.Group {
     this.hasWater = tile.modules.find(m => m.name === 'Water')?.hasWater ?? true;
     this.isAnchor = tile.isAnchor;
     this.lotSize = { ...tile.lotSize };
+    this.tileType = tile.type;
+    this.overlay = tile.overlay;
 
     // Initial position - will be adjusted if it's a large lot
     this._updatePosition();
@@ -516,27 +518,44 @@ export class SimObject extends THREE.Group {
   }
 
   update() {
-    const power = this.tile.modules.find(m => m.name === 'Power')?.hasPower ?? true;
-    const water = this.tile.modules.find(m => m.name === 'Water')?.hasWater ?? true;
-
-    if (this.developmentLevel !== this.tile.developmentLevel || 
-        this.abandoned !== this.tile.abandoned ||
-        this.hasPower !== power ||
-        this.hasWater !== water ||
-        this.isAnchor !== this.tile.isAnchor ||
-        this.lotSize.w !== this.tile.lotSize.w) {
-      
-      this.developmentLevel = this.tile.developmentLevel;
-      this.abandoned = this.tile.abandoned;
-      this.hasPower = power;
-      this.hasWater = water;
-      this.isAnchor = this.tile.isAnchor;
-      this.lotSize = { ...this.tile.lotSize };
-      this._updatePosition();
-      this.updateMesh();
-    }
+    if (!this.hasChanged()) return false;
+    const tile = this.tile;
+    const power = tile.modules.find(m => m.name === 'Power')?.hasPower ?? true;
+    const water = tile.modules.find(m => m.name === 'Water')?.hasWater ?? true;
+    this.developmentLevel = tile.developmentLevel;
+    this.abandoned = tile.abandoned;
+    this.hasPower = power;
+    this.hasWater = water;
+    this.isAnchor = tile.isAnchor;
+    this.tileType = tile.type;
+    this.overlay = tile.overlay;
+    this.lotSize = { ...tile.lotSize };
+    this._updatePosition();
+    this.updateMesh();
+    return true;
   }
 
+  /**
+   * Pure predicate: has any field updateMesh() reads changed since the last
+   * sync? The render loop uses this to decide whether a tile's visual needs a
+   * rebuild. It compares every state input the mesh depends on — including
+   * type and overlay, which the old inline check (developmentLevel/abandoned
+   * only) missed, so an overlay or power/water flip on an existing object was
+   * never rebuilt until an unrelated change forced a refresh.
+   */
+  hasChanged() {
+    const tile = this.tile;
+    const power = tile.modules.find(m => m.name === 'Power')?.hasPower ?? true;
+    const water = tile.modules.find(m => m.name === 'Water')?.hasWater ?? true;
+    return this.developmentLevel !== tile.developmentLevel ||
+      this.abandoned !== tile.abandoned ||
+      this.hasPower !== power ||
+      this.hasWater !== water ||
+      this.isAnchor !== tile.isAnchor ||
+      this.tileType !== tile.type ||
+      this.overlay !== tile.overlay ||
+      this.lotSize.w !== tile.lotSize.w;
+  }
   updateTrafficColor(congestion) {
     if (!this.children || this.children.length === 0) return;
     let mesh = null;

@@ -294,7 +294,7 @@ export class SceneManager {
         const tile = city.grid[x][y];
         const obj = this.objects[x][y];
         
-        if (obj && (obj.developmentLevel !== tile.developmentLevel || obj.abandoned !== tile.abandoned)) {
+        if (obj && obj.hasChanged()) {
           this.updateTileVisuals(x, y, tile);
         } else if (obj) {
           if (tile.type === 'road' || tile.type === 'highway') {
