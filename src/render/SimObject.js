@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { materials } from './MaterialManager.js';
 import { getTileSurfaceHeight, getTerrainHeightAt } from './TerrainSurface.js';
 import { createSeededRandom } from '../sim/SeededRandom.js';
-import { classifyRoadTile, ROAD_BITS, getRoadNeighborMask } from './RoadTopology.js';
+import { classifyRoadTile, ROAD_BITS, getRoadNeighborMask, getDiagonalRoadMask, ROAD_DIAG_BITS } from './RoadTopology.js';
 import { POWER_POLE_HEIGHT, POWER_CROSSARM_Y, POWER_INSULATOR_OFFSET, getPowerNeighborMask } from './PowerWires.js';
 
 /**
@@ -203,19 +203,47 @@ export class SimObject extends THREE.Group {
       }
     } else if ((mask & (ROAD_BITS.north | ROAD_BITS.south)) === (ROAD_BITS.north | ROAD_BITS.south)
                && (mask & (ROAD_BITS.east | ROAD_BITS.west)) === 0) {
-      // Straight N-S: one full strip, extended past both tile edges so it
-      // overlaps its neighbours and covers the rasterization seam.
-      addQuad([-w, -end], [w, -end], [w, end], [-w, end]);
+      // Straight N-S: a full strip extended past both tile edges so it overlaps
+      // its neighbours and covers the rasterization seam. Subdivided as a 2D grid
+      // (not one flat quad, not just length-bands): the terrain splits each tile
+      // along the anti-diagonal into two triangles, so a quad that only spans the
+      // road width still straddles that diagonal and a flat patch can't match
+      // both triangles — green shows through. A fine grid keeps every cell inside
+      // one triangle, so the ribbon hugs the exact rendered surface on slopes.
+      const SEG = 8;
+      for (let i = 0; i < SEG; i++) {
+        const x0 = -w + (2 * w) * (i / SEG);
+        const x1 = -w + (2 * w) * ((i + 1) / SEG);
+        const z0 = -end + (2 * end) * (i / SEG);
+        const z1 = -end + (2 * end) * ((i + 1) / SEG);
+        addQuad([x0, z0], [x1, z0], [x1, z1], [x0, z1]);
+      }
     } else if ((mask & (ROAD_BITS.east | ROAD_BITS.west)) === (ROAD_BITS.east | ROAD_BITS.west)
                && (mask & (ROAD_BITS.north | ROAD_BITS.south)) === 0) {
-      // Straight E-W: one full strip, extended past both tile edges.
-      addQuad([-end, -w], [end, -w], [end, w], [-end, w]);
+      // Straight E-W: same 2D-grid subdivision for slope conformance.
+      const SEG = 8;
+      for (let i = 0; i < SEG; i++) {
+        const x0 = -end + (2 * end) * (i / SEG);
+        const x1 = -end + (2 * end) * ((i + 1) / SEG);
+        const z0 = -w + (2 * w) * (i / SEG);
+        const z1 = -w + (2 * w) * ((i + 1) / SEG);
+        addQuad([x0, z0], [x1, z0], [x1, z1], [x0, z1]);
+      }
     } else {
       // Corner / T / cross: central square + a stub per open direction.
-      // Every extent overlaps its neighbour by `e`, so junctions are seamless.
-      // The overlap is identical flat colour and height on both sides — the two
-      // surfaces coincide exactly, so there is no z-fighting to flicker.
-      addQuad([-w, -w], [w, -w], [w, w], [-w, w]);
+      // The central square is subdivided into a grid (not one flat quad) so it
+      // hugs slopes the same way the straight strips do — otherwise terrain
+      // pokes through its middle on a hillside. Every extent overlaps its
+      // neighbour by `e`, so junctions stay seamless; identical height+colour on
+      // both sides means no z-fighting.
+      const SEG = 6;
+      for (let i = 0; i < SEG; i++) {
+        const x0 = -w + (2 * w) * (i / SEG);
+        const x1 = -w + (2 * w) * ((i + 1) / SEG);
+        const z0 = -w + (2 * w) * (i / SEG);
+        const z1 = -w + (2 * w) * ((i + 1) / SEG);
+        addQuad([x0, z0], [x1, z0], [x1, z1], [x0, z1]);
+      }
       if (mask & ROAD_BITS.north) addQuad([-w, -end], [w, -end], [w, -w], [-w, -w]);
       if (mask & ROAD_BITS.south) addQuad([-w, w], [w, w], [w, end], [-w, end]);
       if (mask & ROAD_BITS.east)  addQuad([w, -w], [end, -w], [end, w], [w, w]);
@@ -231,6 +259,57 @@ export class SimObject extends THREE.Group {
     mesh.name = 'road-visual';
     mesh.receiveShadow = true;
     this.add(mesh);
+
+    // Diagonal connector: when two roads touch only at a corner a small grass
+    // diamond (~0.3 tiles) is exposed between their central pads. Fill it with
+    // a thin triangular strip that bridges each open corner gap. The connector
+    // runs from this tile's corner pad edge (±hw) diagonally across the shared
+    // corner point to ±hw on the other tile. Because it is a road-coloured quad
+    // sitting at the exact terrain surface it is imperceptible as a separate
+    // piece; it simply closes the gap.
+    if (city) {
+      const diagMask = getDiagonalRoadMask(city, this.tile.x, this.tile.y);
+      if (diagMask) {
+        const diagPositions = [];
+        const diagIndices = [];
+        const addDiagQuad = (a, b, c, d) => {
+          const base = diagPositions.length / 3;
+          for (const p of [a, b, c, d]) diagPositions.push(p[0], surf(p[0], p[1]), p[1]);
+          const ux = b[0] - a[0], uz = b[1] - a[1];
+          const vx = c[0] - a[0], vz = c[1] - a[1];
+          if (ux * vz - uz * vx > 0) diagIndices.push(base, base + 2, base + 1, base + 2, base, base + 3);
+          else diagIndices.push(base, base + 1, base + 2, base, base + 2, base + 3);
+        };
+
+        // Each connector is a quad from the two near-corner vertices of this
+        // tile's pad, pinching at the exact shared corner point.
+        // The "reach" toward the corner is `w` (pad half-extent + overlap).
+        if (diagMask & ROAD_DIAG_BITS.northEast) {
+          // Shared corner at (+0.5, -0.5) tile-local → (w, -w) in pad-local coords
+          addDiagQuad([hw, -w], [w, -w], [w, -hw], [hw, -hw]);
+        }
+        if (diagMask & ROAD_DIAG_BITS.southEast) {
+          addDiagQuad([hw, hw], [w, hw], [w, w], [hw, w]);
+        }
+        if (diagMask & ROAD_DIAG_BITS.southWest) {
+          addDiagQuad([-w, hw], [-hw, hw], [-hw, w], [-w, w]);
+        }
+        if (diagMask & ROAD_DIAG_BITS.northWest) {
+          addDiagQuad([-w, -w], [-hw, -w], [-hw, -hw], [-w, -hw]);
+        }
+
+        if (diagPositions.length > 0) {
+          const diagGeom = new THREE.BufferGeometry();
+          diagGeom.setAttribute('position', new THREE.Float32BufferAttribute(diagPositions, 3));
+          diagGeom.setIndex(diagIndices);
+          diagGeom.computeVertexNormals();
+          const diagMesh = new THREE.Mesh(diagGeom, material);
+          diagMesh.name = 'road-diag-connector';
+          diagMesh.receiveShadow = true;
+          this.add(diagMesh);
+        }
+      }
+    }
   }
 
   _addComplexBuilding(type, level, density, w, h) {

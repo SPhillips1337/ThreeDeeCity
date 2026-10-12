@@ -45,16 +45,26 @@ export function getTerrainHeightAt(city, tileX, tileY) {
     }
     return count > 0 ? sum / count : WATER_BED_HEIGHT;
   };
-  const h00 = vertexHeight(x0, y0);
-  const h10 = vertexHeight(x0 + 1, y0);
-  const h01 = vertexHeight(x0, y0 + 1);
-  const h11 = vertexHeight(x0 + 1, y0 + 1);
-  return (
-    h00 * (1 - tx) * (1 - ty) +
-    h10 * tx * (1 - ty) +
-    h01 * (1 - tx) * ty +
-    h11 * tx * ty
-  );
+  const h00 = vertexHeight(x0, y0);       // a: bottom-left corner of the tile
+  const h10 = vertexHeight(x0 + 1, y0);   // d: bottom-right corner
+  const h01 = vertexHeight(x0, y0 + 1);   // b: top-left corner
+  const h11 = vertexHeight(x0 + 1, y0 + 1); // c: top-right corner
+
+  // The rendered mesh is a PlaneGeometry: each tile is TWO flat triangles split
+  // along the anti-diagonal from b (top-left) to d (bottom-right), exactly as
+  // three.js indexes it — tri(a,b,d) and tri(b,c,d). A bilinear blend of the four
+  // corners only equals that surface when the corners are coplanar; on a steep
+  // tile the bilinear value undershoots the rendered triangle by up to half the
+  // corner-height variance, so anything placed via this function (roads, trees,
+  // poles) sinks below the visible ground and terrain pokes through. Return the
+  // EXACT triangle surface instead: it is continuous across the shared diagonal
+  // and matches the mesh pixel-for-pixel, so callers sit precisely on top of it.
+  if (tx + ty <= 1) {
+    // Triangle a,b,d — barycentric weights: a=1-tx-ty, b=ty, d=tx.
+    return h00 * (1 - tx - ty) + h01 * ty + h10 * tx;
+  }
+  // Triangle b,c,d — barycentric weights: b=1-tx, c=tx+ty-1, d=1-ty.
+  return h01 * (1 - tx) + h11 * (tx + ty - 1) + h10 * (1 - ty);
 }
 
 export function getTerrainColorBand({ elevation, slope = 0 }) {
