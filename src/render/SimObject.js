@@ -180,6 +180,20 @@ export class SimObject extends THREE.Group {
       else indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
     };
 
+    // Subdivide a rectangular region into a SEG×SEG grid of quads so every cell
+    // stays within one terrain triangle and the ribbon hugs the exact surface.
+    const addGrid = (x0, x1, z0, z1, seg = 6) => {
+      for (let i = 0; i < seg; i++) {
+        const xi0 = x0 + (x1 - x0) * (i / seg);
+        const xi1 = x0 + (x1 - x0) * ((i + 1) / seg);
+        for (let j = 0; j < seg; j++) {
+          const zj0 = z0 + (z1 - z0) * (j / seg);
+          const zj1 = z0 + (z1 - z0) * ((j + 1) / seg);
+          addQuad([xi0, zj0], [xi1, zj0], [xi1, zj1], [xi0, zj1]);
+        }
+      }
+    };
+
     const count = [ROAD_BITS.north, ROAD_BITS.east, ROAD_BITS.south, ROAD_BITS.west]
       .filter(bit => (mask & bit) !== 0).length;
 
@@ -187,67 +201,38 @@ export class SimObject extends THREE.Group {
       // Isolated road pad (transient while the player is still laying it out)
       addQuad([-w, -w], [w, -w], [w, w], [-w, w]);
     } else if (count === 1) {
+      // Dead-end: stub toward the open direction + wider mouth at the closed end.
+      // Both regions are grid-subdivided to hug the terrain surface on slopes.
       const cw = w * 1.2; // cul-de-sac mouth half-width at the closed end
       if (mask & ROAD_BITS.north) {
-        addQuad([-w, -end], [w, -end], [w, 0], [-w, 0]);          // stub toward N
-        addQuad([-cw, 0], [cw, 0], [cw, end], [-cw, end]);        // mouth at S end
+        addGrid(-w, w, -end, 0);    // stub toward N
+        addGrid(-cw, cw, 0, end);   // mouth at S end
       } else if (mask & ROAD_BITS.south) {
-        addQuad([-w, 0], [w, 0], [w, end], [-w, end]);
-        addQuad([-cw, -end], [cw, -end], [cw, 0], [-cw, 0]);
+        addGrid(-w, w, 0, end);
+        addGrid(-cw, cw, -end, 0);
       } else if (mask & ROAD_BITS.east) {
-        addQuad([0, -w], [end, -w], [end, w], [0, w]);
-        addQuad([-end, -cw], [0, -cw], [0, cw], [-end, cw]);
+        addGrid(0, end, -w, w);
+        addGrid(-end, 0, -cw, cw);
       } else { // west
-        addQuad([-end, -w], [0, -w], [0, w], [-end, w]);
-        addQuad([0, -cw], [end, -cw], [end, cw], [0, cw]);
+        addGrid(-end, 0, -w, w);
+        addGrid(0, end, -cw, cw);
       }
     } else if ((mask & (ROAD_BITS.north | ROAD_BITS.south)) === (ROAD_BITS.north | ROAD_BITS.south)
                && (mask & (ROAD_BITS.east | ROAD_BITS.west)) === 0) {
-      // Straight N-S: a full strip extended past both tile edges so it overlaps
-      // its neighbours and covers the rasterization seam. Subdivided as a 2D grid
-      // (not one flat quad, not just length-bands): the terrain splits each tile
-      // along the anti-diagonal into two triangles, so a quad that only spans the
-      // road width still straddles that diagonal and a flat patch can't match
-      // both triangles — green shows through. A fine grid keeps every cell inside
-      // one triangle, so the ribbon hugs the exact rendered surface on slopes.
-      const SEG = 8;
-      for (let i = 0; i < SEG; i++) {
-        const x0 = -w + (2 * w) * (i / SEG);
-        const x1 = -w + (2 * w) * ((i + 1) / SEG);
-        const z0 = -end + (2 * end) * (i / SEG);
-        const z1 = -end + (2 * end) * ((i + 1) / SEG);
-        addQuad([x0, z0], [x1, z0], [x1, z1], [x0, z1]);
-      }
+      // Straight N-S: grid-subdivided to hug the exact terrain surface on slopes.
+      addGrid(-w, w, -end, end, 8);
     } else if ((mask & (ROAD_BITS.east | ROAD_BITS.west)) === (ROAD_BITS.east | ROAD_BITS.west)
                && (mask & (ROAD_BITS.north | ROAD_BITS.south)) === 0) {
-      // Straight E-W: same 2D-grid subdivision for slope conformance.
-      const SEG = 8;
-      for (let i = 0; i < SEG; i++) {
-        const x0 = -end + (2 * end) * (i / SEG);
-        const x1 = -end + (2 * end) * ((i + 1) / SEG);
-        const z0 = -w + (2 * w) * (i / SEG);
-        const z1 = -w + (2 * w) * ((i + 1) / SEG);
-        addQuad([x0, z0], [x1, z0], [x1, z1], [x0, z1]);
-      }
+      // Straight E-W: same.
+      addGrid(-end, end, -w, w, 8);
     } else {
-      // Corner / T / cross: central square + a stub per open direction.
-      // The central square is subdivided into a grid (not one flat quad) so it
-      // hugs slopes the same way the straight strips do — otherwise terrain
-      // pokes through its middle on a hillside. Every extent overlaps its
-      // neighbour by `e`, so junctions stay seamless; identical height+colour on
-      // both sides means no z-fighting.
-      const SEG = 6;
-      for (let i = 0; i < SEG; i++) {
-        const x0 = -w + (2 * w) * (i / SEG);
-        const x1 = -w + (2 * w) * ((i + 1) / SEG);
-        const z0 = -w + (2 * w) * (i / SEG);
-        const z1 = -w + (2 * w) * ((i + 1) / SEG);
-        addQuad([x0, z0], [x1, z0], [x1, z1], [x0, z1]);
-      }
-      if (mask & ROAD_BITS.north) addQuad([-w, -end], [w, -end], [w, -w], [-w, -w]);
-      if (mask & ROAD_BITS.south) addQuad([-w, w], [w, w], [w, end], [-w, end]);
-      if (mask & ROAD_BITS.east)  addQuad([w, -w], [end, -w], [end, w], [w, w]);
-      if (mask & ROAD_BITS.west)  addQuad([-end, -w], [-w, -w], [-w, w], [-end, w]);
+      // Corner / T / cross: grid-subdivided central square + a grid stub per
+      // open direction. Every region hugs the terrain surface on slopes.
+      addGrid(-w, w, -w, w, 6);
+      if (mask & ROAD_BITS.north) addGrid(-w, w, -end, -w);
+      if (mask & ROAD_BITS.south) addGrid(-w, w,  w,  end);
+      if (mask & ROAD_BITS.east)  addGrid( w, end, -w,  w);
+      if (mask & ROAD_BITS.west)  addGrid(-end, -w, -w,  w);
     }
 
     const geometry = new THREE.BufferGeometry();

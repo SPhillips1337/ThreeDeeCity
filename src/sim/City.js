@@ -264,14 +264,42 @@ export class City {
     const queue = sources.map(s => ({ ...s, d: 0 }));
     sources.forEach(s => grid[s.x][s.y] = true);
 
+    const isRoadTile = (tile) => tile?.type === 'road' || tile?.type === 'highway';
+
     while (queue.length > 0) {
       const { x, y, d } = queue.shift();
       if (d >= maxDistance) continue;
 
+      // Orthogonal neighbors always spread.
       const neighbors = [
         { x: x + 1, y }, { x: x - 1, y },
         { x, y: y + 1 }, { x, y: y - 1 }
       ];
+
+      // Diagonal road-to-road spreading: corner-touching roads form a connected
+      // graph so power/water/road-access propagates across the diagonal gap
+      // (Category A fix). Only traverse a diagonal when the current tile AND the
+      // target are both roads and neither orthogonal bridging tile is also a road
+      // (if an orthogonal bridge exists the path already covered it).
+      if (isRoadTile(this.grid[x]?.[y])) {
+        const diagonals = [
+          { x: x + 1, y: y - 1, ax: x + 1, ay: y, bx: x, by: y - 1 }, // NE
+          { x: x + 1, y: y + 1, ax: x + 1, ay: y, bx: x, by: y + 1 }, // SE
+          { x: x - 1, y: y + 1, ax: x - 1, ay: y, bx: x, by: y + 1 }, // SW
+          { x: x - 1, y: y - 1, ax: x - 1, ay: y, bx: x, by: y - 1 }, // NW
+        ];
+        for (const { x: nx, y: ny, ax, ay, bx, by } of diagonals) {
+          if (nx < 0 || nx >= this.size.width || ny < 0 || ny >= this.size.height) continue;
+          const diagTile = this.grid[nx]?.[ny];
+          if (!isRoadTile(diagTile)) continue;
+          // Skip if either orthogonal bridge is also a road (path exists already)
+          if (isRoadTile(this.grid[ax]?.[ay]) || isRoadTile(this.grid[bx]?.[by])) continue;
+          if (!grid[nx][ny] && canSpreadFunc(diagTile)) {
+            grid[nx][ny] = true;
+            queue.push({ x: nx, y: ny, d: d + 1 });
+          }
+        }
+      }
 
       for (const n of neighbors) {
         if (n.x >= 0 && n.x < this.size.width && n.y >= 0 && n.y < this.size.height) {
