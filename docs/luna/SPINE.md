@@ -35,7 +35,7 @@
   selection/preview, vegetation rebuild, data-view tinting.
 - `SimObject.js` — per-tile 3D mesh factory (buildings, roads, power lines,
   parks, civic). Owns the road ribbon and pole/insulator geometry.
-- `TerrainSurface.js` — heightfield geometry, bilinear surface sampling
+- `TerrainSurface.js` — heightfield geometry, exact triangle-surface sampling
   (`getTerrainHeightAt`), colour bands, water surface.
 - `PowerWires.js` — `PowerWireNetwork` class: sagging wire spans between
   adjacent powered tiles. Exports shared pole constants.
@@ -44,7 +44,7 @@
 - `ParticleSystem.js` — particles (smoke, etc.).
 - `RenderDiagnostics.js` — renderer diagnostics, object disposal.
 - `VegetationPlanner.js` — deterministic vegetation placement.
-- Contract: all placed objects sit on the bilinear terrain surface
+- Contract: all placed objects sit on the exact rendered triangle surface
   (`getTerrainHeightAt`), not a single tile-corner elevation.
 
 ### 4. Audio (`src/AudioManager.js`)
@@ -80,7 +80,7 @@ input (click/drag)
 | `src/sim/SimModule.js` | Simulation | Pluggable modules |
 | `src/render/SceneManager.js` | Rendering | Scene, camera, lights, loop |
 | `src/render/SimObject.js` | Rendering | Per-tile mesh factory |
-| `src/render/TerrainSurface.js` | Rendering | Heightfield, bilinear sampling |
+| `src/render/TerrainSurface.js` | Rendering | Heightfield, exact triangle-surface sampling |
 | `src/render/PowerWires.js` | Rendering | Wire network (new) |
 | `src/render/MaterialManager.js` | Rendering | Material cache |
 | `src/render/CameraRig.js` | Rendering | Camera framing |
@@ -96,9 +96,14 @@ input (click/drag)
 
 1. **Simulation is authoritative.** Rendering reads tile state; it never mutates
    the simulation. A visual bug is a rendering bug, not a simulation bug.
-2. **Terrain surface is bilinear.** `getTerrainHeightAt` samples the same
-   vertex heights the terrain mesh uses. Objects placed at a single corner
-   elevation sink or float on slopes.
+2. **Terrain surface is the exact rendered triangle mesh.** `getTerrainHeightAt`
+   returns the height of the actual rendered surface — each tile is TWO flat triangles
+   split along the anti-diagonal (three.js `tri(a,b,d)` / `tri(b,c,d)`), and the function
+   replicates that split with barycentric weights. It is NOT a bilinear corner blend: on a
+   steep, non-coplanar tile bilinear undershoots the rendered triangle by up to half the
+   corner-height variance, which sinks placed objects below the visible ground (green pokes
+   through roads). Objects placed at a single corner elevation (`getTileSurfaceHeight`)
+   still sink or float on slopes.
 3. **Road ribbons meet at shared edges.** Adjacent road tiles share vertices
    sampled from the heightfield, so there are no gaps or per-tile steps.
 4. **Poles and wires share anchor constants.** `POWER_POLE_HEIGHT`,

@@ -1,0 +1,238 @@
+{
+  "101": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "threedcity_building_concept_00001_.png",
+      "upload": "image"
+    }
+  },
+  "105": {
+    "class_type": "ImageCropToMask",
+    "inputs": {
+      "images": [
+        "101",
+        0
+      ],
+      "masks": [
+        "101",
+        1
+      ],
+      "width": 1024,
+      "height": 1024,
+      "pad_factor": 1.1,
+      "grow_mask": 0,
+      "background": "#000000"
+    }
+  },
+  "106": {
+    "class_type": "CLIPVisionLoader",
+    "inputs": {
+      "clip_name": "dino_v3_L_naf_fp32.safetensors"
+    }
+  },
+  "107": {
+    "class_type": "Pixal3DConditioning",
+    "inputs": {
+      "clip_vision_model": [
+        "106",
+        0
+      ],
+      "image": [
+        "105",
+        0
+      ],
+      "camera_angle_x": 49.13
+    }
+  },
+  "108": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "pixal3d_int8_convrot.safetensors",
+      "weight_dtype": "default"
+    }
+  },
+  "109": {
+    "class_type": "EmptyTrellis2LatentStructure",
+    "inputs": {
+      "batch_size": 1
+    }
+  },
+  "110": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "trellis_2_shape_vae_bf16.safetensors"
+    }
+  },
+  "111": {
+    "class_type": "VaeDecodeStructureTrellis2",
+    "inputs": {
+      "samples": [
+        "109",
+        0
+      ],
+      "vae": [
+        "110",
+        0
+      ],
+      "resolution": "64"
+    }
+  },
+  "112": {
+    "class_type": "Trellis2ShapeStage",
+    "inputs": {
+      "positive": [
+        "107",
+        0
+      ],
+      "negative": [
+        "107",
+        1
+      ],
+      "voxel": [
+        "111",
+        0
+      ]
+    }
+  },
+  "113": {
+    "class_type": "KSampler",
+    "inputs": {
+      "model": [
+        "108",
+        0
+      ],
+      "seed": 42,
+      "steps": 25,
+      "cfg": 7.5,
+      "sampler_name": "dpmpp_2m",
+      "scheduler": "karras",
+      "positive": [
+        "112",
+        0
+      ],
+      "negative": [
+        "112",
+        1
+      ],
+      "latent_image": [
+        "112",
+        2
+      ],
+      "denoise": 1.0
+    }
+  },
+  "114": {
+    "class_type": "VaeDecodeShapeTrellis",
+    "inputs": {
+      "samples": [
+        "113",
+        0
+      ],
+      "vae": [
+        "110",
+        0
+      ]
+    }
+  },
+  "115": {
+    "class_type": "Trellis2TextureStage",
+    "inputs": {
+      "positive": [
+        "107",
+        0
+      ],
+      "negative": [
+        "107",
+        1
+      ],
+      "shape_latent": [
+        "113",
+        0
+      ]
+    }
+  },
+  "116": {
+    "class_type": "KSampler",
+    "inputs": {
+      "model": [
+        "108",
+        0
+      ],
+      "seed": 42,
+      "steps": 25,
+      "cfg": 7.5,
+      "sampler_name": "dpmpp_2m",
+      "scheduler": "karras",
+      "positive": [
+        "115",
+        0
+      ],
+      "negative": [
+        "115",
+        1
+      ],
+      "latent_image": [
+        "115",
+        2
+      ],
+      "denoise": 1.0
+    }
+  },
+  "117": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "trellis_2_texture_vae_bf16.safetensors"
+    }
+  },
+  "118": {
+    "class_type": "VaeDecodeTextureTrellis",
+    "inputs": {
+      "samples": [
+        "116",
+        0
+      ],
+      "vae": [
+        "117",
+        0
+      ],
+      "shape_subdivides": [
+        "114",
+        1
+      ]
+    }
+  },
+  "119": {
+    "class_type": "VoxelToMesh",
+    "inputs": {
+      "voxel": [
+        "118",
+        0
+      ],
+      "algorithm": "surface net",
+      "threshold": 0.6
+    }
+  },
+  "120": {
+    "class_type": "PaintMesh",
+    "inputs": {
+      "mesh": [
+        "114",
+        0
+      ],
+      "voxel_colors": [
+        "118",
+        0
+      ]
+    }
+  },
+  "121": {
+    "class_type": "SaveGLB",
+    "inputs": {
+      "mesh": [
+        "120",
+        0
+      ],
+      "filename_prefix": "threedcity_building"
+    }
+  }
+}

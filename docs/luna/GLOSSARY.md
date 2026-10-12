@@ -24,12 +24,15 @@
 - **Road-visual** — the rendered road mesh. Named `'road-visual'` in
   `SimObject._addRoadMesh`. A terrain-hugging ribbon (BufferGeometry quads)
   sampled from the heightfield.
-- **Terrain heightfield** — the rendered ground mesh. Bilinear between
-  tile-corner vertices. `getTerrainHeightAt(city, x, y)` samples the same
-  vertex heights to return the true surface height at tile-space (x, y).
-- **Bilinear sample** — the interpolation method used by both the terrain
-  mesh and `getTerrainHeightAt`. Objects placed at a single corner
-  elevation (the old `getTileSurfaceHeight`) sink or float on slopes.
+- **Terrain heightfield** — the rendered ground mesh. Each tile is TWO flat
+  triangles split along the anti-diagonal (three.js `tri(a,b,d)` / `tri(b,c,d)`).
+  `getTerrainHeightAt(city, x, y)` returns the exact height of that rendered
+  surface at tile-space (x, y) by replicating the same triangle split.
+- **Triangle-surface sample** — the interpolation method used by both the terrain
+  mesh and `getTerrainHeightAt`: per-tile anti-diagonal split into two triangles,
+  barycentric within each. Objects placed at a single corner elevation (the old
+  `getTileSurfaceHeight`) sink or float on slopes. A bilinear corner blend would
+  undershoot the rendered triangle on steep tiles and let terrain poke through.
 - **LIFT** — a small upward offset (0.02) applied to road-visual vertices
   so the road bed never z-fights the ground mesh.
 - **Crossarm** — the horizontal arm on a power pole. Oriented along the
@@ -57,8 +60,8 @@
 - `elevationToWorldHeight(elevation)` — convert elevation to world height.
 - `getTileSurfaceHeight(tile)` — single-corner elevation (legacy; use
   `getTerrainHeightAt` for placed objects).
-- `getTerrainHeightAt(city, x, y)` — bilinear surface sample at tile-space
-  (x, y). **The correct function for placing objects on terrain.**
+- `getTerrainHeightAt(city, x, y)` — exact rendered triangle-surface height at
+  tile-space (x, y). **The correct function for placing objects on terrain.**
 - `buildTerrainGeometry(city)` — the rendered heightfield mesh.
 - `createWaterSurface(city)` — the water surface mesh.
 
@@ -87,10 +90,13 @@
 
 1. **Simulation is authoritative.** Rendering reads tile state; it never
    mutates the simulation.
-2. **Objects sit on the bilinear surface.** `getTerrainHeightAt` is used for
-   every placed object (buildings, roads, trees, rocks, poles, selection,
-   previews). `getTileSurfaceHeight` is only used as a fallback when
-   `tile.city` is null.
+2. **Objects sit on the exact rendered triangle surface.** `getTerrainHeightAt`
+   is used for every placed object (buildings, roads, trees, rocks, poles,
+   selection, previews) and returns the height of the actual rendered mesh — each
+   tile's two anti-diagonal triangles, not a bilinear corner blend. On a steep,
+   non-coplanar tile a bilinear blend undershoots the rendered triangle and lets
+   terrain poke through roads. `getTileSurfaceHeight` is only used as a fallback
+   when `tile.city` is null.
 3. **Road ribbons meet at shared edges.** Adjacent road tiles share vertices
    sampled from the heightfield. No gaps, no per-tile steps.
 4. **Poles and wires share anchor constants.** `POWER_POLE_HEIGHT`,
